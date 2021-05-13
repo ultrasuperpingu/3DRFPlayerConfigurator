@@ -511,7 +511,7 @@ public class RFPlayerConnection : MonoBehaviour
 	}
 	public void SendCommandWithoutLog(string command)
 	{
-		if (!DeviceConnected)
+		if (s_serial == null || !s_serial.IsOpen)
 		{
 			Debug.LogError("Can't send command because connection is not established");
 			return;
@@ -651,18 +651,46 @@ public class RFPlayerConnection : MonoBehaviour
 					var val = n.SelectSingleNode("v").InnerText;
 					if (name == "Frequency")
 					{
-						freq868 = val.StartsWith("868");
 						//if (freq868)
 						//	FrequencyH = val;
+						//else
+						//	FrequencyL = val;
 					}
-					else if (name == "Mac")
-						MacAddress = val;
-					else if (name == "LBT")
-						LBT = int.Parse(val);
-					else if (name == "Jamming")
-						Jamming = int.Parse(val);
+					else if (name == "RFlinkTrigger")
+					{
+						if (freq868)
+							RFLinkTriggerH = int.Parse(val);
+						else
+							RFLinkTriggerL = int.Parse(val);
+					}
+					else if (name == "DSPTrigger")
+					{
+						if (freq868)
+							DSPTriggerH = int.Parse(val);
+						else
+							DSPTriggerL = int.Parse(val);
+					}
+					else if (name == "Selectivity")
+					{
+						if (freq868)
+							SelectivityH = int.Parse(val);
+						else
+							SelectivityL = int.Parse(val);
+					}
+					else if (name == "Selectivity")
+					{
+						if (freq868)
+							SensitivityH = int.Parse(val);
+						else
+							SensitivityL = int.Parse(val);
+					}
+					else if (name == "RFlink")
+					{
+						RFlinkEnable = int.Parse(val) == 1;
+					}
 					Debug.Log(n.InnerXml);
 				}
+				freq868 = true;
 			}
 			
 		}
@@ -807,6 +835,7 @@ public class RFPlayerConnection : MonoBehaviour
 					else
 					{
 						checkPortCoroutine = null;
+						onConnected.Invoke();
 						break;
 					}
 				}

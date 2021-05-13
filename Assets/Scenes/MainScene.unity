@@ -4811,13 +4811,49 @@ MonoBehaviour:
         m_CallState: 2
   onReceiverProtocolsAvailableChanged:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1754867310}
+        m_TargetAssemblyTypeName: DynamicStringToggleList, Assembly-CSharp
+        m_MethodName: SetList
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
   onRepeaterProtocolsEnabledChanged:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1754867310}
+        m_TargetAssemblyTypeName: DynamicStringToggleList, Assembly-CSharp
+        m_MethodName: SetEnabled
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
   onReceiverProtocolsEnabledChanged:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 2079785207}
+        m_TargetAssemblyTypeName: DynamicStringToggleList, Assembly-CSharp
+        m_MethodName: SetEnabled
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!4 &476827338
 Transform:
   m_ObjectHideFlags: 0
@@ -13045,6 +13081,7 @@ GameObject:
   - component: {fileID: 1179398303}
   - component: {fileID: 1179398302}
   - component: {fileID: 1179398301}
+  - component: {fileID: 1179398305}
   m_Layer: 5
   m_Name: Canvas
   m_TagString: Untagged
@@ -13134,6 +13171,22 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!114 &1179398305
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1179398300}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8049608a30d8af341a8b6229a3ec72c6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  connectionPanel: {fileID: 1648767418}
+  connectedPanel: {fileID: 8542807999954358599}
+  rfplayer: {fileID: 476827337}
+  animator: {fileID: 4427040}
 --- !u!1 &1185120567
 GameObject:
   m_ObjectHideFlags: 0
@@ -21019,6 +21072,7 @@ GameObject:
   - component: {fileID: 2079785204}
   - component: {fileID: 2079785203}
   - component: {fileID: 2079785206}
+  - component: {fileID: 2079785207}
   m_Layer: 5
   m_Name: ReceiversValues
   m_TagString: Untagged
@@ -21136,6 +21190,21 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: 100
   m_LayoutPriority: 1
+--- !u!114 &2079785207
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2079785201}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0c3b8fa9ce885e4ebe03ce0c4501aba, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  togglePrefab: {fileID: 3668658882654521706, guid: 33d41c2f4dea257428714ee21397f7f5, type: 3}
+  rfplayer: {fileID: 476827337}
+  command: RECEIVER
 --- !u!1 &2079864339
 GameObject:
   m_ObjectHideFlags: 0
