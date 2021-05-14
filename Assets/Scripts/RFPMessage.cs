@@ -9,9 +9,16 @@ public class RFPMessage
 		ASCII,
 		BINARY
 	}
+	public enum FrameType : byte
+	{
+		KNOWN_PROTOCOL = 0,
+		RFLINK = 1
+	}
 	string asciiContent;
 	byte[] binaryContent;
-	REGULAR_INCOMING_RF_TO_BINARY_USB_FRAME frame;
+	FrameType frameType;
+	REGULAR_INCOMING_RF_TO_BINARY_USB_FRAME frameKnown;
+	INCOMING_RFLINK_FRAME frameRFLink;
 	public RFPMessage(MessageType t, byte[] content, int startIndex, int count)
 	{
 		Type = t;
@@ -23,15 +30,54 @@ public class RFPMessage
 		{
 			binaryContent = new byte[count];
 			Array.Copy(content, startIndex, binaryContent, 0, count);
-			frame = ByteArrayToStructure<REGULAR_INCOMING_RF_TO_BINARY_USB_FRAME>(content, 5);
-			UnityEngine.Debug.Log(frame.ToString());
+			frameType = (FrameType)binaryContent[5];
+			if (frameType == FrameType.KNOWN_PROTOCOL)
+			{
+				frameKnown = ByteArrayToStructure<REGULAR_INCOMING_RF_TO_BINARY_USB_FRAME>(binaryContent, 5);
+				UnityEngine.Debug.Log(frameKnown.ToString());
+			}
+			else if (frameType == FrameType.RFLINK)
+			{
+				//TODO: FIXME (or check me) @see ByteArrayToStructure
+				frameRFLink = ByteArrayToStructure<INCOMING_RFLINK_FRAME>(binaryContent, 5);
+				UnityEngine.Debug.Log(frameRFLink.ToString());
+			}
+		}
+	}
+	const int MAX_NB_RFLINK_PULSE = 512;
+	[StructLayout(LayoutKind.Explicit)]
+	public unsafe struct INCOMING_RFLINK_FRAME
+	{
+		[FieldOffset(0)] public byte frameType; //=1: RFLINK Frame
+		[FieldOffset(1)] public uint frequency; // Frequency expressed in Khz
+												// Available : 433420, 433920, 868350, 868950. 
+		[FieldOffset(5)] public sbyte RFLevel; // Unit : dB(high signal :-40dB to low : -110dB)
+		[FieldOffset(6)] public sbyte floorNoise; // Unit : dB(high signal :-40dB to low : -110dB)
+		[FieldOffset(7)] public byte pulseElementSize; // Value : 1 
+		[FieldOffset(8)] public ushort number; // Number of Pulses upon RFLINK definition
+		[FieldOffset(10)] public byte repeats; // Number of re-transmits upon RFLINK definition
+		[FieldOffset(11)] public byte delay; // Delay in ms.after trans.upon RFLINK definition
+		[FieldOffset(12)] public byte multiply; // Real pulse unit in microseconds upon RFLINK definition
+												// Value = 40
+		[FieldOffset(16)] public uint time; // Timestamp indicating when the signal was received upon RFLINK definition
+		[FieldOffset(20)] public fixed byte pulses[MAX_NB_RFLINK_PULSE]; //size: number+2 Pulses[0] and Pulses[number+1] are set to 0  upon historical RFLINK definition
+		public override string ToString()
+		{
+			string s = "[RFLink] frameType: " + frameType + " frequency: " + frequency + " RFLevel: " + RFLevel + " floorNoise: " + floorNoise + " pulseElementSize: " + pulseElementSize;
+			s += "\r\nnbPulse: " + number + " repeats: " + repeats + " delay: " + delay + " multiply: " + multiply + " time:" + time;
+			s += "pulses:\r\n";
+			for (int i = 1; i < number && i < MAX_NB_RFLINK_PULSE; i++)
+				s += pulses[i] + " ";
+			return s;
 		}
 	}
 	public override string ToString()
 	{
 		if (Type == MessageType.ASCII)
 			return ASCII;
-		return frame.ToString();
+		if(frameType == FrameType.KNOWN_PROTOCOL)
+			return frameKnown.ToString();
+		return frameRFLink.ToString();
 	}
 
 	public MessageType Type
@@ -193,7 +239,7 @@ upon context	LSB first. Define provided data by the device
 		public ushort idMsb;
 		public override string ToString()
 		{
-			string s = "subtype: " + subtype + " ID: " + (idLsb + idMsb << 16);
+			string s = "[X10 (32 bits ID) and CHACON] subtype: " + subtype + " ID: " + (idLsb + idMsb << 16);
 			return s;
 		}
 	};
@@ -205,7 +251,7 @@ upon context	LSB first. Define provided data by the device
 		public ushort qualifier;
 		public override string ToString()
 		{
-			string s = "subtype: " + subtype + " ID: " + (idLsb + idMsb << 16) + " qualifier: " + qualifier;
+			string s = "[VISONIC/Focus/Atlantic/Meian Tech] subtype: " + subtype + " ID: " + (idLsb + idMsb << 16) + " qualifier: " + qualifier;
 			return s;
 		}
 	};
@@ -217,7 +263,7 @@ upon context	LSB first. Define provided data by the device
 		public ushort qualifier;
 		public override string ToString()
 		{
-			string s = "subtype: " + subtype + " ID: " + (idLsb + idMsb << 16) + " qualifier: " + qualifier;
+			string s = "[RFY] subtype: " + subtype + " ID: " + (idLsb + idMsb << 16) + " qualifier: " + qualifier;
 			return s;
 		}
 	};
@@ -232,7 +278,7 @@ upon context	LSB first. Define provided data by the device
 		public ushort hygro; // 0...100  UNIT: %
 		public override string ToString()
 		{
-			string s = "subtype: " + subtype + " idPhy: " + idPHY + " idChannel: " + idChannel + " qualifier: " + qualifier;
+			string s = "[Scientific Oregon protocol (thermo/hygro sensors)] subtype: " + subtype + " idPhy: " + idPHY + " idChannel: " + idChannel + " qualifier: " + qualifier;
 			s += "\r\ntemperature: " + temp + " hygro: " + hygro;
 			return s;
 		}
@@ -248,7 +294,7 @@ upon context	LSB first. Define provided data by the device
 		public ushort pressure; //  UNIT: hPa
 		public override string ToString()
 		{
-			string s = "subtype: " + subtype + " idPhy: " + idPHY + " idChannel: " + idChannel + " qualifier: " + qualifier;
+			string s = "[Scientific Oregon protocol (Atmospheric pressure sensors)] subtype: " + subtype + " idPhy: " + idPHY + " idChannel: " + idChannel + " qualifier: " + qualifier;
 			s += "\r\ntemperature: " + temp + " hygro: " + hygro + " pressure: " + pressure;
 			return s;
 		}
@@ -264,7 +310,7 @@ upon context	LSB first. Define provided data by the device
 		public ushort direction; //  Wind direction  0-359° (Unit : angular degrees)
 		public override string ToString()
 		{
-			string s = "subtype: " + subtype + " idPhy: " + idPHY + " idChannel: " + idChannel + " qualifier: " + qualifier;
+			string s = "[Scientific Oregon protocol (Wind sensors)] subtype: " + subtype + " idPhy: " + idPHY + " idChannel: " + idChannel + " qualifier: " + qualifier;
 			s += "\r\nspeed: " + speed + " direction: " + direction;
 			return s;
 		}
@@ -279,7 +325,7 @@ upon context	LSB first. Define provided data by the device
 		public ushort light; // UV index  1..10  (Unit : -)
 		public override string ToString()
 		{
-			string s = "subtype: " + subtype + " idPhy: " + idPHY + " idChannel: " + idChannel + " qualifier: " + qualifier;
+			string s = "[Scientific Oregon protocol (UV sensors)] subtype: " + subtype + " idPhy: " + idPHY + " idChannel: " + idChannel + " qualifier: " + qualifier;
 			s += "\r\nlight: " + light;
 			return s;
 		}
@@ -298,7 +344,7 @@ upon context	LSB first. Define provided data by the device
 		public ushort powerI3;   // Instantaneous measured at input 3 power. Unit : W (with U=230V, P2=UxI3)
 		public override string ToString()
 		{
-			string s = "subtype: " + subtype + " idPhy: " + idPHY + " idChannel: " + idChannel + " qualifier: " + qualifier;
+			string s = "[OWL (Energy/power sensors)] subtype: " + subtype + " idPhy: " + idPHY + " idChannel: " + idChannel + " qualifier: " + qualifier;
 			s += "\r\nenergy: " + (energyLsb + energyMsb << 16) + " power: "+power + " powerI1: " + powerI1 + " powerI2: " + powerI2 + " powerI3: " + powerI3;
 			return s;
 		}
@@ -315,7 +361,7 @@ upon context	LSB first. Define provided data by the device
 		public ushort rain;         // Instantaneous measured rain. Unit : 0.01 mm/h
 		public override string ToString()
 		{
-			string s = "subtype: " + subtype + " idPhy: " + idPHY + " idChannel: " + idChannel + " qualifier: " + qualifier;
+			string s = "[OREGON (Rain sensors)] subtype: " + subtype + " idPhy: " + idPHY + " idChannel: " + idChannel + " qualifier: " + qualifier;
 			s += "\r\ntotalRain: " + (totalRainLsb + totalRainMsb << 16);
 			return s;
 		}
@@ -335,7 +381,7 @@ upon context	LSB first. Define provided data by the device
 		public ushort data4; // provision
 		public override string ToString()
 		{
-			string s = "subtype: " + subtype + " ID: " + (idLsb + idMsb << 16) + " qualifier: " + qualifier;
+			string s = "[Thermostats X2D protocol] subtype: " + subtype + " ID: " + (idLsb + idMsb << 16) + " qualifier: " + qualifier;
 			s += "\r\nfunction: " + function + " mode: " + mode;
 			return s;
 		}
@@ -354,7 +400,7 @@ upon context	LSB first. Define provided data by the device
 		public ushort data4; //  provision
 		public override string ToString()
 		{
-			string s = "subtype: " + subtype + " ID: " + (idLsb + idMsb << 16) + " qualifier: " + qualifier;
+			string s = "[Alarm/remote control devices X2D] subtype: " + subtype + " ID: " + (idLsb + idMsb << 16) + " qualifier: " + qualifier;
 			return s;
 		}
 	};
@@ -369,7 +415,7 @@ upon context	LSB first. Define provided data by the device
 		public short setPoint; // UNIT:  1/10 of degree
 		public override string ToString()
 		{
-			string s = "subtype: " + subtype + " ID: " + (idLsb + idMsb << 16) + " qualifier: " + qualifier;
+			string s = "[DIGIMAX TS10 protocol] subtype: " + subtype + " ID: " + (idLsb + idMsb << 16) + " qualifier: " + qualifier;
 			s += "\r\ntemp: " + temp + " setPoint: " + setPoint;
 			return s;
 		}
@@ -409,7 +455,7 @@ upon context	LSB first. Define provided data by the device
 		public ushort apparentPower; // unit: Watt (in fact, it is VA)
 		public override string ToString()
 		{
-			string s = "subtype: " + subtype + " ID: " + (idLsb + idMsb << 16) + " qualifier: " + qualifier;
+			string s = "[Cartelectronic TIC/Pulses devices (Teleinfo/TeleCounters)] subtype: " + subtype + " ID: " + (idLsb + idMsb << 16) + " qualifier: " + qualifier;
 			s += "\r\ninfos: "+infos + " counter1: " + (counter1Lsb + counter1Msb << 16) + " counter2: " + (counter2Lsb + counter2Msb << 16) + "apparentPower: " + apparentPower;
 			return s;
 		}
@@ -423,7 +469,7 @@ upon context	LSB first. Define provided data by the device
 		public ushort qualifier;
 		public override string ToString()
 		{
-			string s = "subtype: " + subtype + " ID: " + (idLsb + idMsb<<16) + " qualifier: " + qualifier;
+			string s = "[FS20] subtype: " + subtype + " ID: " + (idLsb + idMsb<<16) + " qualifier: " + qualifier;
 			return s;
 		}
 	};
@@ -441,7 +487,7 @@ upon context	LSB first. Define provided data by the device
 		public byte infoType;  // type of payload
 		public override string ToString()
 		{
-			string s = "Protocol: " + protocol + " RF level:" + rfLevel + " RF quality:" + rfQuality;
+			string s = "FrameType: " + frameType + " Protocol: " + protocol + " RF level:" + rfLevel + " RF quality:" + rfQuality;
 			return s;
 		}
 	};
@@ -517,6 +563,8 @@ upon context	LSB first. Define provided data by the device
 			return s;
 		}
 	}
+	//TODO: FIXME (or check me)
+	// What happens if the size of byte array is less than the structure size (and it happens)
 	unsafe T ByteArrayToStructure<T>(byte[] bytes, int startOffset = 0) where T : struct
 	{
 		fixed (byte* ptr = &bytes[startOffset])

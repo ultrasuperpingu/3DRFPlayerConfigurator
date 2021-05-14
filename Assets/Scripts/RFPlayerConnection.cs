@@ -11,125 +11,24 @@ using System.Linq;
 
 public class RFPlayerConnection : MonoBehaviour
 {
-	public bool convertBinaryToHexaString = true;
 	public UnityEvent onConnected;
 	public UnityEvent onDisconnected;
-	//public UnityEvent<byte[]> onMessageReceived;
 	public UnityEvent<RFPMessage> onMessageReceived;
-	//public UnityEvent<string> onTextualMessageReceived;
 	public UnityEvent<string> onCommandSent;
-	public UnityEvent<string> onFirmwareChanged;
-	public UnityEvent<int> onFormatModeChanged;
-	public UnityEvent<string> onMACAddressChanged;
-	public UnityEvent<bool> onLEDActivityChanged;
-	public UnityEvent<bool> onRFLinkEnableChanged;
-	public UnityEvent<int> onJammingChanged;
-	public UnityEvent<int> onLBTChanged;
-	public UnityEvent<int> onFrequencyLChanged;
-	public UnityEvent<int> onFrequencyHChanged;
-	public UnityEvent<int> onSelectivityLChanged;
-	public UnityEvent<int> onSelectivityHChanged;
-	public UnityEvent<int> onSensitivityLChanged;
-	public UnityEvent<int> onSensitivityHChanged;
-	public UnityEvent<int> onDSPTriggerLChanged;
-	public UnityEvent<int> onDSPTriggerHChanged;
-	public UnityEvent<int> onRFLinkTriggerLChanged;
-	public UnityEvent<int> onRFLinkTriggerHChanged;
-	public UnityEvent<string[]> onRepeaterProtocolsAvailableChanged;
-	public UnityEvent<string[]> onReceiverProtocolsAvailableChanged;
-	public UnityEvent<bool[]> onRepeaterProtocolsEnabledChanged;
-	public UnityEvent<bool[]> onReceiverProtocolsEnabledChanged;
-
+	
 	private SerialPort s_serial;
 	private const int RECEIVE_BUFFER_SIZE = 8192;
 	private byte[] alreadyRead = new byte[RECEIVE_BUFFER_SIZE];
 	private int nbRead = 0;
 	private BoyerMoore ziSearch = new BoyerMoore(new byte[] { (byte)'Z', (byte)'I' });
-	//private string[] transmitterProtocolsAvailable = new string[0];
-	private string[] receiverProtocolsAvailable = new string[0];
-	private bool[] receiverProtocolsEnabled = new bool[0];
-	private string[] repeaterProtocolsAvailable = new string[0];
-	private bool[] repeaterProtocolsEnabled = new bool[0];
-	public class StringList : List<string>
-	{
-		public StringList(string[] list) : base(list)
-		{
-		}
-	}
-	public class BoolList : List<bool>
-	{
-		public BoolList(bool[] list) : base(list)
-		{
-		}
-	}
-	public StringList RepeaterProtocolsAvailable
-	{
-		get { return new StringList(repeaterProtocolsAvailable); }
-		protected set
-		{
-			repeaterProtocolsAvailable = value.ToArray();
-			onRepeaterProtocolsAvailableChanged.Invoke(value.ToArray());
-		}
-	}
-	public StringList ReceiverProtocolsAvailable
-	{
-		get { return new StringList(receiverProtocolsAvailable); }
-		protected set
-		{
-			receiverProtocolsAvailable = value.ToArray();
-			onReceiverProtocolsAvailableChanged.Invoke(value.ToArray());
-		}
-	}
-	public BoolList RepeaterProtocolsEnabled
-	{
-		get { return new BoolList(repeaterProtocolsEnabled); }
-		protected set
-		{
-			repeaterProtocolsEnabled = value.ToArray();
-			onRepeaterProtocolsEnabledChanged.Invoke(value.ToArray());
-		}
-	}
-	public BoolList ReceiverProtocolsEnabled
-	{
-		get { return new BoolList(receiverProtocolsEnabled); }
-		protected set
-		{
-			receiverProtocolsEnabled = value.ToArray();
-			onReceiverProtocolsEnabledChanged.Invoke(value.ToArray());
-		}
-	}
-
-
-	public enum FormatModeType : int {
-		TEXT,
-		JSON,
-		XML,
-		HEXA,
-		HEXA_FIXED,
-		BINARY,
-		OFF
-	}
 	
-	public enum FrequencyLType : int
-	{
-		F433420,
-		F433920,
-		OFF
-	}
-	
-	public enum FrequencyHType : int
-	{
-		F868350,
-		F868950,
-		OFF
-	}
 
 	public bool DeviceConnected
 	{
 		get { return checkPortCoroutine == null && s_serial != null && s_serial.IsOpen; }
 	}
 
-	#region Parameters
+	#region RFPlayer Parameters and Infos
 	private string _Firmware;
 	public string Firmware
 	{
@@ -142,6 +41,18 @@ public class RFPlayerConnection : MonoBehaviour
 				onFirmwareChanged.Invoke(_Firmware);
 			}
 		}
+	}
+	public UnityEvent<string> onFirmwareChanged;
+
+	public enum FormatModeType : int
+	{
+		TEXT,
+		JSON,
+		XML,
+		HEXA,
+		HEXA_FIXED,
+		BINARY,
+		OFF
 	}
 	private FormatModeType _FormatMode;
 	public FormatModeType FormatMode
@@ -162,6 +73,14 @@ public class RFPlayerConnection : MonoBehaviour
 		get => (int)_FormatMode;
 		set => FormatMode = (FormatModeType)value;
 	}
+	public UnityEvent<int> onFormatModeChanged;
+
+	public enum FrequencyLType : int
+	{
+		F433420,
+		F433920,
+		OFF
+	}
 	private FrequencyLType _FrequencyL;
 	public FrequencyLType FrequencyL
 	{
@@ -170,16 +89,25 @@ public class RFPlayerConnection : MonoBehaviour
 		{
 			if (_FrequencyL != value)
 			{
-				SendCommand("FREQ L " + value.ToString().Replace('_', ' '));
+				SendCommand("FREQ L " + (value.ToString().StartsWith("F")?value.ToString().Replace("F", ""):"0"));
 				_FrequencyL = value;
 				onFrequencyLChanged.Invoke((int)value);
 			}
 		}
 	}
+	
 	public int FrequencyLInt
 	{
 		get => (int)_FrequencyL;
 		set => FrequencyL = (FrequencyLType)value;
+	}
+	public UnityEvent<int> onFrequencyLChanged;
+
+	public enum FrequencyHType : int
+	{
+		F868350,
+		F868950,
+		OFF
 	}
 	private FrequencyHType _FrequencyH;
 	public FrequencyHType FrequencyH
@@ -189,7 +117,7 @@ public class RFPlayerConnection : MonoBehaviour
 		{
 			if (_FrequencyH != value)
 			{
-				SendCommand("FREQ H " + value.ToString());
+				SendCommand("FREQ H " + (value.ToString().StartsWith("F") ? value.ToString().Replace("F", "") : "0"));
 				_FrequencyH = value;
 				onFrequencyHChanged.Invoke((int)value);
 			}
@@ -200,6 +128,7 @@ public class RFPlayerConnection : MonoBehaviour
 		get => (int)_FrequencyH;
 		set => FrequencyH = (FrequencyHType)value;
 	}
+	public UnityEvent<int> onFrequencyHChanged;
 	private int _SelectivityL = 0;
 	public int SelectivityL
 	{
@@ -214,6 +143,7 @@ public class RFPlayerConnection : MonoBehaviour
 			}
 		}
 	}
+	public UnityEvent<int> onSelectivityLChanged;
 	private int _SelectivityH = 0;
 	public int SelectivityH
 	{
@@ -228,6 +158,7 @@ public class RFPlayerConnection : MonoBehaviour
 			}
 		}
 	}
+	public UnityEvent<int> onSelectivityHChanged;
 	private int _SensitivityL = 0;
 	public int SensitivityL
 	{
@@ -242,6 +173,7 @@ public class RFPlayerConnection : MonoBehaviour
 			}
 		}
 	}
+	public UnityEvent<int> onSensitivityLChanged;
 	private int _SensitivityH = 0;
 	public int SensitivityH
 	{
@@ -256,6 +188,7 @@ public class RFPlayerConnection : MonoBehaviour
 			}
 		}
 	}
+	public UnityEvent<int> onSensitivityHChanged;
 	private int _DSPTriggerL = 0;
 	public int DSPTriggerL
 	{
@@ -270,6 +203,7 @@ public class RFPlayerConnection : MonoBehaviour
 			}
 		}
 	}
+	public UnityEvent<int> onDSPTriggerLChanged;
 	private int _DSPTriggerH = 0;
 	public int DSPTriggerH
 	{
@@ -284,6 +218,7 @@ public class RFPlayerConnection : MonoBehaviour
 			}
 		}
 	}
+	public UnityEvent<int> onDSPTriggerHChanged;
 	private int _RFLinkTriggerL = 0;
 	public int RFLinkTriggerL
 	{
@@ -298,6 +233,7 @@ public class RFPlayerConnection : MonoBehaviour
 			}
 		}
 	}
+	public UnityEvent<int> onRFLinkTriggerLChanged;
 	private int _RFLinkTriggerH = 0;
 	public int RFLinkTriggerH
 	{
@@ -312,6 +248,7 @@ public class RFPlayerConnection : MonoBehaviour
 			}
 		}
 	}
+	public UnityEvent<int> onRFLinkTriggerHChanged;
 	private int _LBT = 0;
 	public int LBT
 	{
@@ -326,6 +263,7 @@ public class RFPlayerConnection : MonoBehaviour
 			}
 		}
 	}
+	public UnityEvent<int> onLBTChanged;
 	private int _Jamming = 0;
 	public int Jamming
 	{
@@ -340,6 +278,8 @@ public class RFPlayerConnection : MonoBehaviour
 			}
 		}
 	}
+	public UnityEvent<int> onJammingChanged;
+	
 	private string _MacAddress;
 	public string MacAddress
 	{
@@ -354,6 +294,7 @@ public class RFPlayerConnection : MonoBehaviour
 			}
 		}
 	}
+	public UnityEvent<string> onMACAddressChanged;
 
 	bool _LEDActivity = true;
 	public bool LEDActivity
@@ -366,18 +307,93 @@ public class RFPlayerConnection : MonoBehaviour
 			onLEDActivityChanged.Invoke(value);
 		}
 	}
+	public UnityEvent<bool> onLEDActivityChanged;
+
 	bool _RFlinkEnable = true;
 	public bool RFlinkEnable
 	{
 		get => _RFlinkEnable;
 		set
 		{
-			SendCommand("FORMAT RFLINK " + (value ? "BINARY" : "OFF"));
-			_RFlinkEnable = value;
-			onRFLinkEnableChanged.Invoke(value);
+			if (value != _RFlinkEnable)
+			{
+				SendCommand("FORMAT RFLINK " + (value ? "BINARY" : "OFF"));
+				_RFlinkEnable = value;
+				onRFLinkEnableChanged.Invoke(value);
+			}
 		}
 	}
-	// TODO INITLB
+	public UnityEvent<bool> onRFLinkEnableChanged;
+
+	private string[] transmitterProtocolsAvailable = new string[] {
+		"VISONIC433", "VISONIC868", "CHACON", "DOMIA", "X10", "X2D433", "X2D868", "X2DSHUTTER",
+		"X2DELEC", "X2DGAS", "RTS", "BLYSS", "PARROT", "KD101", "FS20", "EDISIO"
+	};
+	public string[] TransmitterProtocolsAvailable
+	{
+		get { return transmitterProtocolsAvailable; }
+		protected set
+		{
+			transmitterProtocolsAvailable = value;
+			//onTransmitterProtocolsAvailableChanged.Invoke(value);
+		}
+	}
+	//public UnityEvent<string[]> onTransmitterProtocolsAvailableChanged;
+
+	private string[] _RepeaterProtocolsAvailable = new string[] {
+		"X10", "RTS", "VISONIC", "BLYSS", "CHACON", "OREGONV1", "OREGONV2", "OREGONV3/OWL",
+		"DOMIA", "X2D", "KD101", "PARROT", "TIC", "FS20", "EDISIO"
+	};
+	public string[] RepeaterProtocolsAvailable
+	{
+		get { return _RepeaterProtocolsAvailable; }
+		protected set
+		{
+			_RepeaterProtocolsAvailable = value;
+			onRepeaterProtocolsAvailableChanged.Invoke(value);
+		}
+	}
+	public UnityEvent<string[]> onRepeaterProtocolsAvailableChanged;
+	
+	private string[] _ReceiverProtocolsAvailable = new string[]{
+		"X10", "RTS", "VISONIC", "BLYSS", "CHACON", "OREGONV1", "OREGONV2", "OREGONV3/OWL",
+		"DOMIA", "X2D", "KD101", "PARROT", "TIC", "FS20", "JAMMING", "EDISIO"
+	};
+	public string[] ReceiverProtocolsAvailable
+	{
+		get { return _ReceiverProtocolsAvailable; }
+		protected set
+		{
+			_ReceiverProtocolsAvailable = value;
+			onReceiverProtocolsAvailableChanged.Invoke(value);
+		}
+	}
+	public UnityEvent<string[]> onReceiverProtocolsAvailableChanged;
+
+	private bool[] _RepeaterProtocolsEnabled = new bool[0];
+	public bool[] RepeaterProtocolsEnabled
+	{
+		get { return _RepeaterProtocolsEnabled; }
+		protected set
+		{
+			_RepeaterProtocolsEnabled = value;
+			onRepeaterProtocolsEnabledChanged.Invoke(value);
+		}
+	}
+	public UnityEvent<bool[]> onRepeaterProtocolsEnabledChanged;
+
+	private bool[] _ReceiverProtocolsEnabled = new bool[0];
+	public bool[] ReceiverProtocolsEnabled
+	{
+		get { return _ReceiverProtocolsEnabled; }
+		protected set
+		{
+			_ReceiverProtocolsEnabled = value;
+			onReceiverProtocolsEnabledChanged.Invoke(value);
+		}
+	}
+	public UnityEvent<bool[]> onReceiverProtocolsEnabledChanged;
+
 	#endregion
 
 	public void FactoryReset(bool all)
@@ -406,10 +422,15 @@ public class RFPlayerConnection : MonoBehaviour
 			}
 		}
 	}
+	void OnApplicationQuit()
+	{
+		DisposeSerial();
+	}
+
 	private bool _isMessagePending = false;
 	private RFPMessage ReadMessage()
 	{
-		Debug.Log("toread: " + s_serial.BytesToRead);
+		//Debug.Log("toread: " + s_serial.BytesToRead);
 		var nbReadNow = s_serial.Read(alreadyRead, nbRead, s_serial.BytesToRead);
 		nbRead += nbReadNow;
 		//var message3 = Encoding.ASCII.GetString(alreadyRead, 0, nbRead);
@@ -499,10 +520,6 @@ public class RFPlayerConnection : MonoBehaviour
 		}
 		return null;
 	}
-	void OnApplicationQuit()
-	{
-		DisposeSerial();
-	}
 
 	public void SendCommand(string command)
 	{
@@ -519,12 +536,14 @@ public class RFPlayerConnection : MonoBehaviour
 		command = "ZIA++" + command;
 		s_serial.WriteLine(command);
 	}
+
+	#region Update requests (STATUS Messages sending and parsing)
 	private bool _updating = false;
 	public void UpdateSystemStatus()
 	{
 		if(!DeviceConnected)
 		{
-			Debug.LogError("Unable to update because deviceis not connected");
+			Debug.LogError("Unable to update because device is not connected");
 			return;
 		}
 		StartCoroutine("_UpdateSystemStatus");
@@ -533,6 +552,11 @@ public class RFPlayerConnection : MonoBehaviour
 	IEnumerator _UpdateSystemStatus()
 	{
 		Debug.Log("UpdateSystemStatus");
+		if(_updating)
+		{
+			Debug.Log("Already updating");
+			yield break;
+		}
 		while (_isMessagePending)
 			yield return null;
 		_updating = true;
@@ -556,6 +580,7 @@ public class RFPlayerConnection : MonoBehaviour
 		try
 		{
 			XmlDocument doc = new XmlDocument();
+			//Debug.Log(message.ASCII);
 			doc.LoadXml(message.ASCII.Substring(5));
 			var nodes = doc.SelectNodes("/systemStatus/i");
 			foreach (XmlNode n in nodes)
@@ -570,36 +595,52 @@ public class RFPlayerConnection : MonoBehaviour
 					LBT = int.Parse(val);
 				else if (name == "Jamming")
 					Jamming = int.Parse(val);
-				Debug.Log(n.InnerXml);
+				//Debug.Log(n.InnerXml);
 			}
-			nodes = doc.SelectNodes("/systemStatus/repeater/available/p");
-			List<string> repeaters = new List<string>();
-			foreach (XmlNode n in nodes)
-			{
-				repeaters.Add(n.InnerText);
-			}
-			RepeaterProtocolsAvailable = new StringList(repeaters.ToArray());
+			// There is a bug in the firmaware. Available protocols sent by module is not consistent.
+			onRepeaterProtocolsAvailableChanged.Invoke(_RepeaterProtocolsAvailable);
+			//nodes = doc.SelectNodes("/systemStatus/repeater/available/p");
+			//List<string> repeaters = new List<string>();
+			//foreach (XmlNode n in nodes)
+			//{
+			//	repeaters.Add(n.InnerText);
+			//}
+			//RepeaterProtocolsAvailable = repeaters.ToArray();
 			nodes = doc.SelectNodes("/systemStatus/repeater/enabled/p");
-			bool[] repeatersEnabled = new bool[repeaters.Count];
+			bool[] repeatersEnabled = new bool[_RepeaterProtocolsAvailable.Length];
 			foreach (XmlNode n in nodes)
 			{
-				repeatersEnabled[repeaters.IndexOf(n.InnerText)] = true;
+				var index = Array.IndexOf(_RepeaterProtocolsAvailable, n.InnerText);
+				if(index < 0)
+				{
+					Debug.LogError("Protocol "+n.InnerText+" is enabled but unavailable");
+					continue;
+				}
+				repeatersEnabled[index] = true;
 			}
-			RepeaterProtocolsEnabled = new BoolList(repeatersEnabled);
-			nodes = doc.SelectNodes("/systemStatus/receiver/available/p");
-			List<string> receivers = new List<string>();
-			foreach (XmlNode n in nodes)
-			{
-				receivers.Add(n.InnerText);
-			}
-			ReceiverProtocolsAvailable = new StringList(repeaters.ToArray());
+			RepeaterProtocolsEnabled = repeatersEnabled;
+			// There is a bug in the firmaware. Available protocols sent by module is not consistent.
+			onReceiverProtocolsAvailableChanged.Invoke(_ReceiverProtocolsAvailable);
+			//nodes = doc.SelectNodes("/systemStatus/receiver/available/p");
+			//List<string> receivers = new List<string>();
+			//foreach (XmlNode n in nodes)
+			//{
+			//	receivers.Add(n.InnerText);
+			//}
+			//ReceiverProtocolsAvailable = repeaters.ToArray();
 			nodes = doc.SelectNodes("/systemStatus/receiver/enabled/p");
-			bool[] receiversEnabled = new bool[receivers.Count];
+			bool[] receiversEnabled = new bool[_ReceiverProtocolsAvailable.Length];
 			foreach (XmlNode n in nodes)
 			{
-				receiversEnabled[receivers.IndexOf(n.InnerText)] = true;
+				var index = Array.IndexOf(_ReceiverProtocolsAvailable, n.InnerText);
+				if(index < 0)
+				{
+					Debug.LogError("Receiver protocol " + n.InnerText + " is set to enabled but not in availables one.");
+					continue;
+				}
+				receiversEnabled[index] = true;
 			}
-			ReceiverProtocolsEnabled = new BoolList(receiversEnabled);
+			ReceiverProtocolsEnabled = receiversEnabled;
 		}
 		catch (Exception e)
 		{
@@ -611,13 +652,19 @@ public class RFPlayerConnection : MonoBehaviour
 	{
 		if (!DeviceConnected)
 		{
-			Debug.LogError("Unable to update because deviceis not connected");
+			Debug.LogError("Unable to update because device is not connected");
 			return;
 		}
 		StartCoroutine("_UpdateRadioStatus");
 	}
 	IEnumerator _UpdateRadioStatus()
 	{
+		Debug.Log("UpdateRadioStatus");
+		if (_updating)
+		{
+			Debug.Log("Already updating");
+			yield break;
+		}
 		while (_isMessagePending)
 			yield return null;
 		_updating = true;
@@ -641,20 +688,35 @@ public class RFPlayerConnection : MonoBehaviour
 			XmlDocument doc = new XmlDocument();
 			doc.LoadXml(message.ASCII.Substring(5));
 			var bands = doc.SelectNodes("/radioStatus/band");
+			bool freq868 = false; // first band is presume to be 433MHz, second 868
 			foreach (XmlNode band in bands)
 			{
 				var nodes = band.SelectNodes("i");
-				bool freq868 = false;
+				
 				foreach (XmlNode n in nodes)
 				{
 					var name = n.SelectSingleNode("n").InnerText;
 					var val = n.SelectSingleNode("v").InnerText;
 					if (name == "Frequency")
 					{
-						//if (freq868)
-						//	FrequencyH = val;
-						//else
-						//	FrequencyL = val;
+						if (freq868)
+						{
+							if(val == "868350")
+								FrequencyH = FrequencyHType.F868350;
+							else if (val == "868950")
+								FrequencyH = FrequencyHType.F868950;
+							else // 0
+								FrequencyH = FrequencyHType.OFF;
+						}
+						else
+						{
+							if (val == "433420")
+								FrequencyL = FrequencyLType.F433420;
+							else if (val == "433920")
+								FrequencyL = FrequencyLType.F433920;
+							else // 0
+								FrequencyL = FrequencyLType.OFF;
+						}
 					}
 					else if (name == "RFlinkTrigger")
 					{
@@ -663,7 +725,7 @@ public class RFPlayerConnection : MonoBehaviour
 						else
 							RFLinkTriggerL = int.Parse(val);
 					}
-					else if (name == "DSPTrigger")
+					else if (name == "DspTrigger")
 					{
 						if (freq868)
 							DSPTriggerH = int.Parse(val);
@@ -688,11 +750,10 @@ public class RFPlayerConnection : MonoBehaviour
 					{
 						RFlinkEnable = int.Parse(val) == 1;
 					}
-					Debug.Log(n.InnerXml);
+					//Debug.Log(n.InnerXml);
 				}
 				freq868 = true;
 			}
-			
 		}
 		catch (Exception e)
 		{
@@ -704,13 +765,19 @@ public class RFPlayerConnection : MonoBehaviour
 	{
 		if (!DeviceConnected)
 		{
-			Debug.LogError("Unable to update because deviceis not connected");
+			Debug.LogError("Unable to update because device is not connected");
 			return;
 		}
 		StartCoroutine("_UpdateTranscoderStatus");
 	}
 	IEnumerator _UpdateTranscoderStatus()
 	{
+		Debug.Log("UpdateTranscoderStatus");
+		if (_updating)
+		{
+			Debug.Log("Already updating");
+			yield break;
+		}
 		while (_isMessagePending)
 			yield return null;
 		_updating = true;
@@ -736,14 +803,19 @@ public class RFPlayerConnection : MonoBehaviour
 	{
 		if (!DeviceConnected)
 		{
-			Debug.LogError("Unable to update because deviceis not connected");
+			Debug.LogError("Unable to update because device is not connected");
 			return;
 		}
 		StartCoroutine("_UpdateParrotStatus");
 	}
 	IEnumerator _UpdateParrotStatus()
 	{
-		while (_isMessagePending)
+		Debug.Log("UpdateParrotStatus");
+		if (_updating)
+		{
+			Debug.Log("Already updating");
+			yield break;
+		} while (_isMessagePending)
 			yield return null;
 		_updating = true;
 		SendCommand("STATUS PARROT XML");
@@ -759,6 +831,8 @@ public class RFPlayerConnection : MonoBehaviour
 		doc.LoadXml(message.ASCII.Substring(5));
 		_updating = false;
 	}
+	#endregion
+	
 	private void DisposeSerial()
 	{
 		if (s_serial != null)
@@ -781,8 +855,8 @@ public class RFPlayerConnection : MonoBehaviour
 		s_serial.DataReceived += serial_DataReceived;
 		s_serial.ErrorReceived += serial_ErrorReceived;
 		s_serial.PinChanged += serial_PinChanged;
-		s_serial.WriteTimeout = 100;
-		s_serial.ReadTimeout = 100;
+		s_serial.WriteTimeout = 200;
+		s_serial.ReadTimeout = 200;
 		s_serial.Open();
 	}
 
@@ -795,18 +869,7 @@ public class RFPlayerConnection : MonoBehaviour
 			checkPortCoroutine = StartCoroutine(CheckPortsForDevice());
 		}
 	}
-	/*IEnumerator SendCommandAndGetAnswer(string command, out byte[] response)
-	{
-		SendCommand(command);
-		yield return ReadMessageCoroutine(out response);
 
-	}
-
-	private IEnumerator ReadMessageCoroutine(out byte[] response)
-	{
-		response = alreadyRead;
-		yield return null;
-	}*/
 
 	Coroutine checkPortCoroutine;
 	IEnumerator CheckPortsForDevice()
@@ -823,7 +886,6 @@ public class RFPlayerConnection : MonoBehaviour
 					if (s_serial != null && s_serial.PortName == p)
 						continue;
 					OpenPort(p);
-					Debug.Log(DeviceConnected);
 					yield return new WaitForSeconds(0.2f);
 					SendCommand("HELLO");
 					yield return new WaitForSeconds(0.2f);
@@ -840,20 +902,6 @@ public class RFPlayerConnection : MonoBehaviour
 					}
 				}
 			}
-			/*ManagementObjectSearcher manObjSearch = new ManagementObjectSearcher("Select * from Win32_SerialPort");
-			ManagementObjectCollection manObjReturn = manObjSearch.Get();
-
-			foreach (ManagementObject manObj in manObjReturn)
-			{
-				//int s = manObj.Properties.Count;
-				//foreach (PropertyData d in manObj.Properties)
-				//{
-				//    Console.WriteLine(d.Name);
-				//}
-				Console.WriteLine(manObj["DeviceID"].ToString());
-				Console.WriteLine(manObj["Name"].ToString());
-				Console.WriteLine(manObj["Caption"].ToString());
-			}*/
 			yield return wait;
 		}
 		Debug.Log("Device connected");

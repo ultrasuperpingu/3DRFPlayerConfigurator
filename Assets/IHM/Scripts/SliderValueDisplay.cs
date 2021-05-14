@@ -8,9 +8,11 @@ using TMPro;
 public class SliderValueDisplay : MonoBehaviour
 {
 	public Slider slider;
-	private void Start()
+	private void Awake()
 	{
-		slider.onValueChanged.AddListener(f => GetComponent<TextMeshProUGUI>().text = f.ToString("F0"));
+		slider.onValueChanged.AddListener(f => 
+			GetComponent<TextMeshProUGUI>().text = f.ToString("F0")
+		);
 		GetComponent<TextMeshProUGUI>().text = slider.value.ToString("F0");
 	}
 }

@@ -16,7 +16,7 @@ public class SetRFPlayerParams : MonoBehaviour
 	}
 	public void SetSelectivityH(float val)
 	{
-		rfpCon.SelectivityL = (int)val;
+		rfpCon.SelectivityH = (int)val;
 	}
 	public void SetSensitivityL(float val)
 	{

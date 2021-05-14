@@ -10,12 +10,9 @@ public class DynamicStringToggleList : MonoBehaviour
 	private ScrollRect scrollrect;
 	public RFPlayerConnection rfplayer;
 	public string command = "REPEATER";
-	private void Start()
-	{
-		scrollrect = GetComponent<ScrollRect>();
-	}
 	public void SetList(string[] list)
 	{
+		var scrollrect = GetComponent<ScrollRect>();
 		while (scrollrect.content.transform.childCount > 0)
 		{
 			var c = scrollrect.content.transform.GetChild(0);
@@ -32,7 +29,8 @@ public class DynamicStringToggleList : MonoBehaviour
 	}
 	public void SetEnabled(bool[] list)
 	{
-		for(int i=0;i< scrollrect.content.childCount;i++)
+		var scrollrect = GetComponent<ScrollRect>();
+		for (int i=0;i< scrollrect.content.childCount;i++)
 		{
 			scrollrect.content.GetChild(i).GetComponent<Toggle>().SetIsOnWithoutNotify(list[i]);
 		}

@@ -8,6 +8,6 @@ public class SliderValueSetter : MonoBehaviour
 {
 	public void SetValue(System.Int32 val)
 	{
-		GetComponent<Slider>().SetValueWithoutNotify(val);
+		GetComponent<Slider>().value = val;
 	}
 }
