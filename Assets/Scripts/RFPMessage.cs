@@ -67,7 +67,7 @@ public class RFPMessage
 			s += "\r\nnbPulse: " + number + " repeats: " + repeats + " delay: " + delay + " multiply: " + multiply + " time:" + time;
 			s += "pulses:\r\n";
 			for (int i = 1; i < number && i < MAX_NB_RFLINK_PULSE; i++)
-				s += pulses[i] + " ";
+				s += pulses[i].ToString("X2") + " ";
 			return s;
 		}
 	}

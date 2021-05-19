@@ -8,6 +8,7 @@ using System.Text;
 using System;
 using System.Xml;
 using System.Linq;
+using System.IO;
 
 public class RFPlayerConnection : MonoBehaviour
 {
@@ -18,6 +19,7 @@ public class RFPlayerConnection : MonoBehaviour
 	
 	private SerialPort s_serial;
 	private const int RECEIVE_BUFFER_SIZE = 8192;
+	private const int UPDATE_FIRMWARE_PACKET_SIZE = 12000;
 	private byte[] alreadyRead = new byte[RECEIVE_BUFFER_SIZE];
 	private int nbRead = 0;
 	private BoyerMoore ziSearch = new BoyerMoore(new byte[] { (byte)'Z', (byte)'I' });
@@ -89,7 +91,8 @@ public class RFPlayerConnection : MonoBehaviour
 		{
 			if (_FrequencyL != value)
 			{
-				SendCommand("FREQ L " + (value.ToString().StartsWith("F")?value.ToString().Replace("F", ""):"0"));
+				if (!_updating)
+					SendCommand("FREQ L " + (value.ToString().StartsWith("F")?value.ToString().Replace("F", ""):"0"));
 				_FrequencyL = value;
 				onFrequencyLChanged.Invoke((int)value);
 			}
@@ -117,7 +120,8 @@ public class RFPlayerConnection : MonoBehaviour
 		{
 			if (_FrequencyH != value)
 			{
-				SendCommand("FREQ H " + (value.ToString().StartsWith("F") ? value.ToString().Replace("F", "") : "0"));
+				if (!_updating)
+					SendCommand("FREQ H " + (value.ToString().StartsWith("F") ? value.ToString().Replace("F", "") : "0"));
 				_FrequencyH = value;
 				onFrequencyHChanged.Invoke((int)value);
 			}
@@ -137,7 +141,8 @@ public class RFPlayerConnection : MonoBehaviour
 		{
 			if (value != _SelectivityL && value >= 0 && value <= 5)
 			{
-				SendCommand("SELECTIVITY L " + value);
+				if (!_updating)
+					SendCommand("SELECTIVITY L " + value);
 				_SelectivityL = value;
 				onSelectivityLChanged.Invoke(value);
 			}
@@ -152,7 +157,8 @@ public class RFPlayerConnection : MonoBehaviour
 		{
 			if (value != _SelectivityH && value >= 0 && value <= 5)
 			{
-				SendCommand("SELECTIVITY H " + value);
+				if (!_updating)
+					SendCommand("SELECTIVITY H " + value);
 				_SelectivityH = value;
 				onSelectivityHChanged.Invoke(value);
 			}
@@ -167,7 +173,8 @@ public class RFPlayerConnection : MonoBehaviour
 		{
 			if (value != _SensitivityL && value >= 0 && value <= 4)
 			{
-				SendCommand("SENSITIVITY L " + value);
+				if (!_updating)
+					SendCommand("SENSITIVITY L " + value);
 				_SensitivityL = value;
 				onSensitivityLChanged.Invoke(value);
 			}
@@ -182,7 +189,8 @@ public class RFPlayerConnection : MonoBehaviour
 		{
 			if (value != _SensitivityH && value >= 0 && value <= 4)
 			{
-				SendCommand("SENSITIVITY H " + value);
+				if (!_updating)
+					SendCommand("SENSITIVITY H " + value);
 				_SensitivityH = value;
 				onSensitivityHChanged.Invoke(value);
 			}
@@ -198,7 +206,8 @@ public class RFPlayerConnection : MonoBehaviour
 			if (value != _DSPTriggerL && value >= 0 && value <= 20)
 			{
 				_DSPTriggerL = value;
-				SendCommand("DSPTRIGGER L " + value);
+				if (!_updating)
+					SendCommand("DSPTRIGGER L " + value);
 				onDSPTriggerLChanged.Invoke(value);
 			}
 		}
@@ -213,7 +222,8 @@ public class RFPlayerConnection : MonoBehaviour
 			if (value != _DSPTriggerH && value >= 0 && value <= 20)
 			{
 				_DSPTriggerH = value;
-				SendCommand("DSPTRIGGER H " + value);
+				if (!_updating)
+					SendCommand("DSPTRIGGER H " + value);
 				onDSPTriggerHChanged.Invoke(value);
 			}
 		}
@@ -228,7 +238,8 @@ public class RFPlayerConnection : MonoBehaviour
 			if (value != _RFLinkTriggerL && value >= 0 && value <= 20)
 			{
 				_RFLinkTriggerL = value;
-				SendCommand("RFLINKTRIGGER L " + value);
+				if (!_updating)
+					SendCommand("RFLINKTRIGGER L " + value);
 				onRFLinkTriggerLChanged.Invoke(value);
 			}
 		}
@@ -243,7 +254,8 @@ public class RFPlayerConnection : MonoBehaviour
 			if (value != _RFLinkTriggerH && value >= 0 && value <= 20)
 			{
 				_RFLinkTriggerH = value;
-				SendCommand("RFLINKTRIGGER H " + value);
+				if (!_updating)
+					SendCommand("RFLINKTRIGGER H " + value);
 				onRFLinkTriggerHChanged.Invoke(value);
 			}
 		}
@@ -258,7 +270,8 @@ public class RFPlayerConnection : MonoBehaviour
 			if (value != _LBT && value >= 0 && value <= 30)
 			{
 				_LBT = value;
-				SendCommand("LBT " + value);
+				if (!_updating)
+					SendCommand("LBT " + value);
 				onLBTChanged.Invoke(value);
 			}
 		}
@@ -273,7 +286,8 @@ public class RFPlayerConnection : MonoBehaviour
 			if (value != _Jamming && value >= 0 && value <= 10)
 			{
 				_Jamming = value;
-				SendCommand("JAMMING " + value);
+				if(!_updating)
+					SendCommand("JAMMING " + value);
 				onJammingChanged.Invoke(value);
 			}
 		}
@@ -288,7 +302,8 @@ public class RFPlayerConnection : MonoBehaviour
 		{
 			if (_MacAddress != value)
 			{
-				SendCommand("SETMAC " + value);
+				if (!_updating)
+					SendCommand("SETMAC " + value);
 				_MacAddress = value;
 				onMACAddressChanged.Invoke(value);
 			}
@@ -302,7 +317,8 @@ public class RFPlayerConnection : MonoBehaviour
 		get => _LEDActivity;
 		set
 		{
-			SendCommand("LEDACTIVITY " + (value ? 1 : 0));
+			if (!_updating)
+				SendCommand("LEDACTIVITY " + (value ? 1 : 0));
 			_LEDActivity = value;
 			onLEDActivityChanged.Invoke(value);
 		}
@@ -317,7 +333,8 @@ public class RFPlayerConnection : MonoBehaviour
 		{
 			if (value != _RFlinkEnable)
 			{
-				SendCommand("FORMAT RFLINK " + (value ? "BINARY" : "OFF"));
+				if (!_updating)
+					SendCommand("FORMAT RFLINK " + (value ? "BINARY" : "OFF"));
 				_RFlinkEnable = value;
 				onRFLinkEnableChanged.Invoke(value);
 			}
@@ -394,6 +411,9 @@ public class RFPlayerConnection : MonoBehaviour
 	}
 	public UnityEvent<bool[]> onReceiverProtocolsEnabledChanged;
 
+	public UnityEvent<float> onFirmwareUpdateProgress;
+	public UnityEvent onFirmwareUpdateEnded;
+
 	#endregion
 
 	public void FactoryReset(bool all)
@@ -405,7 +425,47 @@ public class RFPlayerConnection : MonoBehaviour
 	{
 		SendCommand("INITLB");
 	}
-	
+
+	public void UpdateFirmware(string file)
+	{
+		if(File.Exists(file))
+		{
+			StartCoroutine(_UpdateFirmware(file));
+		}
+	}
+
+	private IEnumerator _UpdateFirmware(string file)
+	{
+		_updating = true;
+		var content = File.ReadAllBytes(file);
+		int written = 0;
+		onFirmwareUpdateProgress.Invoke(0);
+		for (int i = 0; i < content.Length; i += UPDATE_FIRMWARE_PACKET_SIZE)
+		{
+			var remaining = content.Length - written;
+			try
+			{
+				s_serial.Write(content, written, Mathf.Min(UPDATE_FIRMWARE_PACKET_SIZE, remaining));
+				// I guess we still need to read messages (not done in update since _updating == true) but not sure
+				var message = ReadMessage();
+				if (message != null)
+					onMessageReceived.Invoke(message);
+			}
+			catch (Exception e)
+			{
+				Debug.LogException(e);
+				_updating = false;
+				onFirmwareUpdateEnded.Invoke();
+				yield break;
+			}
+			yield return null;
+			written += remaining;
+			onFirmwareUpdateProgress.Invoke(written / (float)content.Length);
+		}
+		onFirmwareUpdateEnded.Invoke();
+		_updating = false;
+	}
+
 	private void Start()
 	{
 		checkPortCoroutine = StartCoroutine(CheckPortsForDevice());
@@ -534,6 +594,7 @@ public class RFPlayerConnection : MonoBehaviour
 			return;
 		}
 		command = "ZIA++" + command;
+		Debug.Log("Sending command: " + command);
 		s_serial.WriteLine(command);
 	}
 
@@ -580,7 +641,7 @@ public class RFPlayerConnection : MonoBehaviour
 		try
 		{
 			XmlDocument doc = new XmlDocument();
-			//Debug.Log(message.ASCII);
+			Debug.Log(message.ASCII);
 			doc.LoadXml(message.ASCII.Substring(5));
 			var nodes = doc.SelectNodes("/systemStatus/i");
 			foreach (XmlNode n in nodes)
@@ -588,13 +649,21 @@ public class RFPlayerConnection : MonoBehaviour
 				var name = n.SelectSingleNode("n").InnerText;
 				var val = n.SelectSingleNode("v").InnerText;
 				if (name == "Version")
+				{
 					this.Firmware = val;
+				}
 				else if (name == "Mac")
+				{
 					MacAddress = val;
+				}
 				else if (name == "LBT")
+				{
 					LBT = int.Parse(val);
+				}
 				else if (name == "Jamming")
+				{
 					Jamming = int.Parse(val);
+				}
 				//Debug.Log(n.InnerXml);
 			}
 			// There is a bug in the firmaware. Available protocols sent by module is not consistent.
@@ -896,6 +965,7 @@ public class RFPlayerConnection : MonoBehaviour
 					}
 					else
 					{
+						SendCommand("FORMAT TEXT");
 						checkPortCoroutine = null;
 						onConnected.Invoke();
 						break;
@@ -917,4 +987,5 @@ public class RFPlayerConnection : MonoBehaviour
 	{
 		Debug.Log(e.EventType);
 	}
+
 }
