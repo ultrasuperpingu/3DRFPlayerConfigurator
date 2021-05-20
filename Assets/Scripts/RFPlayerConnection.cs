@@ -439,31 +439,35 @@ public class RFPlayerConnection : MonoBehaviour
 		_updating = true;
 		var content = File.ReadAllBytes(file);
 		int written = 0;
+		s_serial.WriteTimeout = 1200;
 		onFirmwareUpdateProgress.Invoke(0);
 		for (int i = 0; i < content.Length; i += UPDATE_FIRMWARE_PACKET_SIZE)
 		{
 			var remaining = content.Length - written;
+			var toWrite = Mathf.Min(UPDATE_FIRMWARE_PACKET_SIZE, remaining);
 			try
 			{
-				s_serial.Write(content, written, Mathf.Min(UPDATE_FIRMWARE_PACKET_SIZE, remaining));
 				// I guess we still need to read messages (not done in update since _updating == true) but not sure
-				var message = ReadMessage();
-				if (message != null)
+				RFPMessage message;
+				while((message = ReadMessage()) != null)
 					onMessageReceived.Invoke(message);
+				s_serial.Write(content, written, toWrite);
 			}
 			catch (Exception e)
 			{
 				Debug.LogException(e);
 				_updating = false;
 				onFirmwareUpdateEnded.Invoke();
+				s_serial.WriteTimeout = 200;
 				yield break;
 			}
 			yield return null;
-			written += remaining;
+			written += toWrite;
 			onFirmwareUpdateProgress.Invoke(written / (float)content.Length);
 		}
 		onFirmwareUpdateEnded.Invoke();
 		_updating = false;
+		s_serial.WriteTimeout = 200;
 	}
 
 	private void Start()
@@ -488,6 +492,17 @@ public class RFPlayerConnection : MonoBehaviour
 	}
 
 	private bool _isMessagePending = false;
+	private RFPMessage toReemit;
+	public void Reemit()
+	{
+		if(DeviceConnected)
+		{
+			Debug.Log(toReemit.BINARY);
+			var copy = toReemit.BINARY.ToArray();
+			//copy[1] = 0;
+			s_serial.Write(copy,0, copy.Length);
+		}
+	}
 	private RFPMessage ReadMessage()
 	{
 		//Debug.Log("toread: " + s_serial.BytesToRead);
@@ -535,6 +550,10 @@ public class RFPlayerConnection : MonoBehaviour
 			if (nbRead >= binarySize + 5) // message is complete
 			{
 				var m = new RFPMessage(RFPMessage.MessageType.BINARY, alreadyRead, 0, nbRead);
+				if(m.IsRFLink)
+				{
+					toReemit = m;
+				}
 				var message = BitConverter.ToString(alreadyRead, 0, nbRead).Replace("-", "");
 				Debug.Log("Binary received: size=" + nbRead + " read size: " + binarySize + " m:" + message);
 				onMessageReceived.Invoke(m);

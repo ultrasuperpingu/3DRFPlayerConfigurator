@@ -17,6 +17,10 @@ public class RFPMessage
 	string asciiContent;
 	byte[] binaryContent;
 	FrameType frameType;
+	public bool IsRFLink
+	{
+		get { return Type == MessageType.BINARY && frameType == FrameType.RFLINK; }
+	}
 	REGULAR_INCOMING_RF_TO_BINARY_USB_FRAME frameKnown;
 	INCOMING_RFLINK_FRAME frameRFLink;
 	public RFPMessage(MessageType t, byte[] content, int startIndex, int count)
@@ -60,15 +64,16 @@ public class RFPMessage
 		[FieldOffset(12)] public byte multiply; // Real pulse unit in microseconds upon RFLINK definition
 												// Value = 40
 		[FieldOffset(16)] public uint time; // Timestamp indicating when the signal was received upon RFLINK definition
-		[FieldOffset(20)] public fixed byte pulses[MAX_NB_RFLINK_PULSE]; //size: number+2 Pulses[0] and Pulses[number+1] are set to 0  upon historical RFLINK definition
+		[FieldOffset(20)] public fixed byte pulses[MAX_NB_RFLINK_PULSE+2]; //size: number+2 Pulses[0] and Pulses[number+1] are set to 0  upon historical RFLINK definition
 		public override string ToString()
 		{
 			string s = "[RFLink] frameType: " + frameType + " frequency: " + frequency + " RFLevel: " + RFLevel + " floorNoise: " + floorNoise + " pulseElementSize: " + pulseElementSize;
-			s += "\r\nnbPulse: " + number + " repeats: " + repeats + " delay: " + delay + " multiply: " + multiply + " time:" + time;
-			s += "pulses:\r\n";
+			s += " repeats: " + repeats + " delay: " + delay + " time:" + time;
+			s += "\r\nPulses=" + number + ";";
+			s += "\r\nPulses(uSec)=\r\n";
 			for (int i = 1; i < number && i < MAX_NB_RFLINK_PULSE; i++)
-				s += pulses[i].ToString("X2") + " ";
-			return s;
+				s += (pulses[i] * multiply) + ",";
+			return s.TrimEnd(',');
 		}
 	}
 	public override string ToString()
