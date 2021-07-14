@@ -143,7 +143,8 @@ public class RFPMessage
 		OREGON_V2_433     = 19, // not reachable by API
 		OREGON_V3_433     = 20, // not reachable by API
 		TIC_433           = 21, // not reachable by API
-		FS20_868          = 22
+		FS20_868          = 22,
+		EDISIO            = 23
 	}
 	public enum Action : byte
 	{
@@ -156,7 +157,7 @@ public class RFPMessage
 		ASSOC      = 6, //Used by most protocols
 		DISSOC     = 7, //provision
 		ASSOC_OFF  = 8, //Used by PARROT for its OFF entries
-		DISSOC_OFF = 9// provision
+		DISSOC_OFF = 9  //provision
 	}
 	public struct MESSAGE_CONTAINER_HEADER
 	{
@@ -211,20 +212,22 @@ upon context	LSB first. Define provided data by the device
 	public enum IncomingProtocol
 	{
 		UNDEFINED = 0,
-		X10       = 1,
-		VISONIC   = 2,
-		BLYSS     = 3,
-		CHACON    = 4,
-		OREGON    = 5,
-		DOMIA     = 6,
-		OWL       = 7,
-		X2D       = 8,
-		RFY       = 9,
-		KD101     = 10,
-		PARROT    = 11,
+		X10       = 1,  // Use InfosType 0, 1
+		VISONIC   = 2,  // Use InfosType 2
+		BLYSS     = 3,  // Use InfosType 1
+		CHACON    = 4,  // Use InfosType 1
+		OREGON    = 5,  // Use InfosType 4, 5, 6, 7, 9
+		DOMIA     = 6,  // Use InfosType 0
+		OWL       = 7,  // Use InfosType 8
+		X2D       = 8,  // Use InfosType 10, 11
+		RFY       = 9,  // Use InfosType 3
+		KD101     = 10, // Use InfosType 1
+		PARROT    = 11, // Use InfosType 0
 		DIGIMAX   = 12, /* deprecated */
-		TIC       = 13,
-		FS20      = 14
+		TIC       = 13, // Use InfosType 13
+		FS20      = 14, // Use InfosType 1, 14
+		JAMMING   = 15, // Use InfosType 1
+		EDISIO    = 16  // Use InfosType 15
 	}
 
 	public struct INCOMING_RF_INFOS_TYPE0
@@ -478,6 +481,20 @@ upon context	LSB first. Define provided data by the device
 			return s;
 		}
 	};
+	public struct INCOMING_RF_INFOS_TYPE15
+	{ // Used by EDISIO
+		public ushort subtype; // Command field
+		public ushort idLsb;
+		public ushort idMsb;
+		public ushort qualifier;  // channel identifier
+		public ushort infos;  // MID (D0-D7): Model field, BL (D8-D15): Battery level (1/10V)
+		public uint additionalData;
+		public override string ToString()
+		{
+			string s = "[FS20] subtype: " + subtype + " ID: " + (idLsb + idMsb << 16) + " qualifier: " + qualifier;
+			return s;
+		}
+	};
 	/* *************************************************************************** */
 
 	public struct REGULAR_INCOMING_RF_TO_BINARY_USB_FRAME_HEADER
@@ -517,6 +534,9 @@ upon context	LSB first. Define provided data by the device
 		[FieldOffset(8)] public INCOMING_RF_INFOS_TYPE10 type10;
 		[FieldOffset(8)] public INCOMING_RF_INFOS_TYPE11 type11;
 		[FieldOffset(8)] public INCOMING_RF_INFOS_TYPE12 type12;
+		[FieldOffset(8)] public INCOMING_RF_INFOS_TYPE13 type13;
+		[FieldOffset(8)] public INCOMING_RF_INFOS_TYPE14 type14;
+		[FieldOffset(8)] public INCOMING_RF_INFOS_TYPE15 type15;
 		public override string ToString()
 		{
 			string s = header.ToString() + "\r\n";
@@ -560,6 +580,15 @@ upon context	LSB first. Define provided data by the device
 					break;
 				case 12:
 					s += type12.ToString();
+					break;
+				case 13:
+					s += type13.ToString();
+					break;
+				case 14:
+					s += type14.ToString();
+					break;
+				case 15:
+					s += type15.ToString();
 					break;
 				default:
 					s += "Error, infoType not known";

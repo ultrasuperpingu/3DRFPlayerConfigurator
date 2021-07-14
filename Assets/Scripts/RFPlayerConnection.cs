@@ -98,7 +98,7 @@ public class RFPlayerConnection : MonoBehaviour
 			}
 		}
 	}
-	
+
 	public int FrequencyLInt
 	{
 		get => (int)_FrequencyL;
@@ -450,6 +450,7 @@ public class RFPlayerConnection : MonoBehaviour
 				// I guess we still need to read messages (not done in update since _updating == true) but not sure
 				RFPMessage message;
 				while((message = ReadMessage()) != null)
+				while((message = ReadMessage()) != null)
 					onMessageReceived.Invoke(message);
 				s_serial.Write(content, written, toWrite);
 			}
@@ -616,6 +617,16 @@ public class RFPlayerConnection : MonoBehaviour
 		Debug.Log("Sending command: " + command);
 		s_serial.WriteLine(command);
 	}
+	public void SendBinaryCommand(byte[] bcommand)
+	{
+		if (s_serial == null || !s_serial.IsOpen)
+		{
+			Debug.LogError("Can't send command because connection is not established");
+			return;
+		}
+		s_serial.Write(bcommand, 0, bcommand.Length);
+	}
+
 
 	#region Update requests (STATUS Messages sending and parsing)
 	private bool _updating = false;
