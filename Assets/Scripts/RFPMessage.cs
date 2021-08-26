@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -22,8 +23,8 @@ public class RFPMessage
 		get { return Type == MessageType.BINARY && frameType == FrameType.RFLINK; }
 	}
 	REGULAR_INCOMING_RF_TO_BINARY_USB_FRAME frameKnown;
-	INCOMING_RFLINK_FRAME frameRFLink;
-	public RFPMessage(MessageType t, byte[] content, int startIndex, int count)
+	internal INCOMING_RFLINK_FRAME frameRFLink;
+	public unsafe RFPMessage(MessageType t, byte[] content, int startIndex, int count)
 	{
 		Type = t;
 		if (t == MessageType.ASCII)
@@ -43,8 +44,12 @@ public class RFPMessage
 			else if (frameType == FrameType.RFLINK)
 			{
 				//TODO: FIXME (or check me) @see ByteArrayToStructure
-				frameRFLink = ByteArrayToStructure<INCOMING_RFLINK_FRAME>(binaryContent, 5);
-				UnityEngine.Debug.Log(frameRFLink.ToString());
+				//frameRFLink = ByteArrayToStructure<INCOMING_RFLINK_FRAME>(binaryContent, 5);
+				frameRFLink = ByteArrayToINCOMING_RFLINK_FRAME(binaryContent, 5);
+				if(count - 5 != (17 + frameRFLink.number + 2))
+				{
+					UnityEngine.Debug.LogError("RFLink size is not good");
+				}
 			}
 		}
 	}
@@ -63,17 +68,46 @@ public class RFPMessage
 		[FieldOffset(11)] public byte delay; // Delay in ms.after trans.upon RFLINK definition
 		[FieldOffset(12)] public byte multiply; // Real pulse unit in microseconds upon RFLINK definition
 												// Value = 40
-		[FieldOffset(16)] public uint time; // Timestamp indicating when the signal was received upon RFLINK definition
-		[FieldOffset(20)] public fixed byte pulses[MAX_NB_RFLINK_PULSE+2]; //size: number+2 Pulses[0] and Pulses[number+1] are set to 0  upon historical RFLINK definition
+		[FieldOffset(13)] public uint time; // Timestamp indicating when the signal was received upon RFLINK definition
+		[FieldOffset(17)] public fixed byte pulses[MAX_NB_RFLINK_PULSE+2]; //size: number+2 Pulses[0] and Pulses[number+1] are set to 0  upon historical RFLINK definition
 		public override string ToString()
 		{
 			string s = "[RFLink] frameType: " + frameType + " frequency: " + frequency + " RFLevel: " + RFLevel + " floorNoise: " + floorNoise + " pulseElementSize: " + pulseElementSize;
-			s += " repeats: " + repeats + " delay: " + delay + " time:" + time;
+			s += " repeats: " + repeats + " delay: " + delay + " multiply: " + multiply + " time:" + time;
 			s += "\r\nPulses=" + number + ";";
 			s += "\r\nPulses(uSec)=\r\n";
-			for (int i = 1; i < number && i < MAX_NB_RFLINK_PULSE; i++)
+			for (int i = 0; i < number + 2 && i < MAX_NB_RFLINK_PULSE; i++)
 				s += (pulses[i] * multiply) + ",";
 			return s.TrimEnd(',');
+		}
+		public byte[] ToBinary()
+		{
+			byte[] bin = new byte[17 + number];
+			bin[0] = frameType;
+			Array.Copy(BitConverter.GetBytes(frequency), 0, bin, 1, 4);
+			bin[5] = (byte)RFLevel;
+			bin[6] = (byte)floorNoise;
+			bin[7] = pulseElementSize;
+			Array.Copy(BitConverter.GetBytes(number), 0, bin, 8, 2);
+			bin[10] = repeats;
+			bin[11] = delay;
+			bin[12] = multiply;
+			Array.Copy(BitConverter.GetBytes(time), 0, bin, 13, 4);
+			unsafe
+			{
+				fixed (byte* bPtr = bin)
+				{
+					var j = 0;
+					while (j < number + 2)
+					{
+						*(bPtr + 17 + j) = pulses[j];
+						j++;
+					}
+				}
+			}
+
+			//Array.Copy(pulses, 0, bin, 17, number+2);
+			return bin;
 		}
 	}
 	public override string ToString()
@@ -96,7 +130,23 @@ public class RFPMessage
 	}
 	public byte[] BINARY
 	{
-		get { return binaryContent; }
+		get
+		{
+			if(IsRFLink)
+			{
+				var rflink = frameRFLink.ToBinary();
+				byte[] bytes = new byte[5 + rflink.Length];
+				bytes[0] = (byte)'Z';
+				bytes[1] = (byte)'I';
+				bytes[2] = 1;
+				ushort len = (ushort)rflink.Length;
+				bytes[3] = (byte)(len & 0xFF);
+				bytes[4] = (byte)((len >> 8) & 0xFF);
+				Array.Copy(rflink, 0, bytes, 5, len);
+				return bytes;
+			}
+			return binaryContent;
+		}
 	}
 	public string BINARYHEX
 	{
@@ -605,5 +655,35 @@ upon context	LSB first. Define provided data by the device
 		{
 			return (T)Marshal.PtrToStructure((IntPtr)ptr, typeof(T));
 		}
+	}
+	
+	INCOMING_RFLINK_FRAME ByteArrayToINCOMING_RFLINK_FRAME(byte[] bytes, int startOffset = 0)
+	{
+		INCOMING_RFLINK_FRAME frame = default;
+		frame.frameType = bytes[startOffset];
+		frame.frequency = BitConverter.ToUInt32(bytes, startOffset+1);
+		// Available : 433420, 433920, 868350, 868950. 
+		frame.RFLevel = (sbyte)bytes[startOffset + 5];
+		frame.floorNoise = (sbyte)bytes[startOffset + 6];
+		frame.pulseElementSize = bytes[startOffset + 7];
+		frame.number = BitConverter.ToUInt16(bytes, startOffset + 8);
+		frame.repeats = bytes[startOffset + 10];
+		frame.delay = bytes[startOffset + 11];
+		frame.multiply = bytes[startOffset + 12];
+		frame.time = BitConverter.ToUInt32(bytes, startOffset + 13);
+		unsafe
+		{
+			fixed (byte* bPtr = bytes)
+			{
+				var j = 0;
+				while (j < frame.number + 2)
+				{
+					*(frame.pulses + j) = *(bPtr + startOffset + 17 + j);
+					j++;
+				}
+			}
+		}
+		//Array.Copy(bytes, 17,, 0, frame.number + 2);
+		return frame;
 	}
 }

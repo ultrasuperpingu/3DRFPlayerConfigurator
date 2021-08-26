@@ -96,6 +96,10 @@ public class RFPlayerConnection : MonoBehaviour
 				_FrequencyL = value;
 				onFrequencyLChanged.Invoke((int)value);
 			}
+			else if (_updating)
+			{
+				onFrequencyLChanged.Invoke((int)value);
+			}
 		}
 	}
 
@@ -125,6 +129,10 @@ public class RFPlayerConnection : MonoBehaviour
 				_FrequencyH = value;
 				onFrequencyHChanged.Invoke((int)value);
 			}
+			else if (_updating)
+			{
+				onFrequencyHChanged.Invoke((int)value);
+			}
 		}
 	}
 	public int FrequencyHInt
@@ -146,6 +154,10 @@ public class RFPlayerConnection : MonoBehaviour
 				_SelectivityL = value;
 				onSelectivityLChanged.Invoke(value);
 			}
+			else if (_updating && value >= 0 && value <= 5)
+			{
+				onSelectivityLChanged.Invoke(value);
+			}
 		}
 	}
 	public UnityEvent<int> onSelectivityLChanged;
@@ -160,6 +172,10 @@ public class RFPlayerConnection : MonoBehaviour
 				if (!_updating)
 					SendCommand("SELECTIVITY H " + value);
 				_SelectivityH = value;
+				onSelectivityHChanged.Invoke(value);
+			}
+			else if (_updating && value >= 0 && value <= 5)
+			{
 				onSelectivityHChanged.Invoke(value);
 			}
 		}
@@ -178,6 +194,10 @@ public class RFPlayerConnection : MonoBehaviour
 				_SensitivityL = value;
 				onSensitivityLChanged.Invoke(value);
 			}
+			else if (_updating && value >= 0 && value <= 4)
+			{
+				onSensitivityLChanged.Invoke(value);
+			}
 		}
 	}
 	public UnityEvent<int> onSensitivityLChanged;
@@ -192,6 +212,10 @@ public class RFPlayerConnection : MonoBehaviour
 				if (!_updating)
 					SendCommand("SENSITIVITY H " + value);
 				_SensitivityH = value;
+				onSensitivityHChanged.Invoke(value);
+			}
+			else if (_updating && value >= 0 && value <= 4)
+			{
 				onSensitivityHChanged.Invoke(value);
 			}
 		}
@@ -210,6 +234,10 @@ public class RFPlayerConnection : MonoBehaviour
 					SendCommand("DSPTRIGGER L " + value);
 				onDSPTriggerLChanged.Invoke(value);
 			}
+			else if (_updating && value >= 0 && value <= 20)
+			{
+				onDSPTriggerLChanged.Invoke(value);
+			}
 		}
 	}
 	public UnityEvent<int> onDSPTriggerLChanged;
@@ -224,6 +252,10 @@ public class RFPlayerConnection : MonoBehaviour
 				_DSPTriggerH = value;
 				if (!_updating)
 					SendCommand("DSPTRIGGER H " + value);
+				onDSPTriggerHChanged.Invoke(value);
+			}
+			else if (_updating && value >= 0 && value <= 20)
+			{
 				onDSPTriggerHChanged.Invoke(value);
 			}
 		}
@@ -242,6 +274,10 @@ public class RFPlayerConnection : MonoBehaviour
 					SendCommand("RFLINKTRIGGER L " + value);
 				onRFLinkTriggerLChanged.Invoke(value);
 			}
+			else if (_updating && value >= 0 && value <= 20)
+			{
+				onRFLinkTriggerLChanged.Invoke(value);
+			}
 		}
 	}
 	public UnityEvent<int> onRFLinkTriggerLChanged;
@@ -256,6 +292,10 @@ public class RFPlayerConnection : MonoBehaviour
 				_RFLinkTriggerH = value;
 				if (!_updating)
 					SendCommand("RFLINKTRIGGER H " + value);
+				onRFLinkTriggerHChanged.Invoke(value);
+			}
+			else if (_updating && value >= 0 && value <= 20)
+			{
 				onRFLinkTriggerHChanged.Invoke(value);
 			}
 		}
@@ -274,6 +314,10 @@ public class RFPlayerConnection : MonoBehaviour
 					SendCommand("LBT " + value);
 				onLBTChanged.Invoke(value);
 			}
+			else if (_updating && value >= 0 && value <= 30)
+			{
+				onLBTChanged.Invoke(value);
+			}
 		}
 	}
 	public UnityEvent<int> onLBTChanged;
@@ -288,6 +332,10 @@ public class RFPlayerConnection : MonoBehaviour
 				_Jamming = value;
 				if(!_updating)
 					SendCommand("JAMMING " + value);
+				onJammingChanged.Invoke(value);
+			}
+			else if (_updating && value >= 0 && value <= 10)
+			{
 				onJammingChanged.Invoke(value);
 			}
 		}
@@ -305,6 +353,10 @@ public class RFPlayerConnection : MonoBehaviour
 				if (!_updating)
 					SendCommand("SETMAC " + value);
 				_MacAddress = value;
+				onMACAddressChanged.Invoke(value);
+			}
+			else if (_updating)
+			{
 				onMACAddressChanged.Invoke(value);
 			}
 		}
@@ -336,6 +388,10 @@ public class RFPlayerConnection : MonoBehaviour
 				if (!_updating)
 					SendCommand("FORMAT RFLINK " + (value ? "BINARY" : "OFF"));
 				_RFlinkEnable = value;
+				onRFLinkEnableChanged.Invoke(value);
+			}
+			else if(_updating)
+			{
 				onRFLinkEnableChanged.Invoke(value);
 			}
 		}
@@ -498,10 +554,13 @@ public class RFPlayerConnection : MonoBehaviour
 	{
 		if(DeviceConnected)
 		{
-			Debug.Log(toReemit.BINARY);
+			toReemit.frameRFLink.repeats = 5;
 			var copy = toReemit.BINARY.ToArray();
-			//copy[1] = 0;
-			s_serial.Write(copy,0, copy.Length);
+			s_serial.Write(copy, 0, copy.Length);
+			//s_serial.Write(copy, 0, copy.Length);
+			//s_serial.Write(copy, 0, copy.Length);
+			//s_serial.Write(copy, 0, copy.Length);
+			//s_serial.Write(copy, 0, copy.Length);
 		}
 	}
 	private RFPMessage ReadMessage()
@@ -575,7 +634,7 @@ public class RFPlayerConnection : MonoBehaviour
 			//else message not complete.
 			else
 			{
-				Debug.Log("not finished (size:" + (binarySize + 5) + ", read:" + nbRead + ")");
+				//Debug.Log("not finished (size:" + (binarySize + 5) + ", read:" + nbRead + ")");
 				_isMessagePending = true;
 			}
 		}

@@ -22,4 +22,13 @@ public class MessagesView : MonoBehaviour
 		mess.GetComponentInChildren<TextMeshProUGUI>().text = message.ToString();
 		mess.GetComponentInChildren<Button>().onClick.AddListener(() => GUIUtility.systemCopyBuffer = mess.GetComponentInChildren<TextMeshProUGUI>().text);
 	}
+	public void ClearMessages()
+	{
+		while(GetComponent<ScrollRect>().content.childCount > 0)
+		{
+			var c = GetComponent<ScrollRect>().content.GetChild(0);
+			c.SetParent(null);
+			Destroy(c.gameObject);
+		}
+	}
 }
