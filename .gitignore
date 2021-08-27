@@ -53,7 +53,6 @@ sysinfo.txt
 
 # Builds
 *.apk
-*.unitypackage
 
 # Crashlytics generated file
 crashlytics-build.properties
@@ -61,3 +60,5 @@ crashlytics-build.properties
 /.vsconfig
 /Assets/3D/rfplayer.blend1.meta
 /Assets/3D/rfplayer.blend1
+
+Build_Linux
