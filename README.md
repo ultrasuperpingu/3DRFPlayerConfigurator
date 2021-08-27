@@ -14,5 +14,5 @@ Possible answers:
  * Why not?
  * Because I can
  * It was fun to do
- * It could be useful for interactive help (maybe?, one day?)
+ * It could be useful for interactive help (maybe?, some day?)
 
