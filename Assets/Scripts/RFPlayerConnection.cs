@@ -592,7 +592,17 @@ public class RFPlayerConnection : MonoBehaviour
 			{
 				//onTextualMessageReceived.Invoke(message);
 				//Debug.Log(message);
-				var m = new RFPMessage(RFPMessage.MessageType.ASCII, alreadyRead, 0, nbRead);
+
+				RFPMessage m = null;
+				try
+				{
+					m = new RFPMessage(RFPMessage.MessageType.ASCII, alreadyRead, 0, nbRead);
+				}
+				catch(TypeLoadException e)
+				{
+					Debug.LogException(e);
+					Debug.LogError(e.Message);
+				}
 				onMessageReceived.Invoke(m);
 				nbRead = 0;
 				_isMessagePending = false;
@@ -609,7 +619,7 @@ public class RFPlayerConnection : MonoBehaviour
 			int binarySize = alreadyRead[3] + alreadyRead[4] * 256;
 			if (nbRead >= binarySize + 5) // message is complete
 			{
-				var m = new RFPMessage(RFPMessage.MessageType.BINARY, alreadyRead, 0, nbRead);
+				var m = new RFPMessage(RFPMessage.MessageType.BINARY, alreadyRead, 0, binarySize + 5);
 				if(m.IsRFLink)
 				{
 					toReemit = m;

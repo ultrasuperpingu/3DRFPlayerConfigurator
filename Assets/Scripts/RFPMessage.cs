@@ -39,12 +39,9 @@ public class RFPMessage
 			if (frameType == FrameType.KNOWN_PROTOCOL)
 			{
 				frameKnown = ByteArrayToStructure<REGULAR_INCOMING_RF_TO_BINARY_USB_FRAME>(binaryContent, 5);
-				UnityEngine.Debug.Log(frameKnown.ToString());
 			}
 			else if (frameType == FrameType.RFLINK)
 			{
-				//TODO: FIXME (or check me) @see ByteArrayToStructure
-				//frameRFLink = ByteArrayToStructure<INCOMING_RFLINK_FRAME>(binaryContent, 5);
 				frameRFLink = ByteArrayToINCOMING_RFLINK_FRAME(binaryContent, 5);
 				if(count - 5 != (17 + frameRFLink.number + 2))
 				{
@@ -70,6 +67,7 @@ public class RFPMessage
 												// Value = 40
 		[FieldOffset(13)] public uint time; // Timestamp indicating when the signal was received upon RFLINK definition
 		[FieldOffset(17)] public fixed byte pulses[MAX_NB_RFLINK_PULSE+2]; //size: number+2 Pulses[0] and Pulses[number+1] are set to 0  upon historical RFLINK definition
+		//[FieldOffset(17)] public byte[] pulses; //size: number+2 Pulses[0] and Pulses[number+1] are set to 0  upon historical RFLINK definition
 		public override string ToString()
 		{
 			string s = "[RFLink] frameType: " + frameType + " frequency: " + frequency + " RFLevel: " + RFLevel + " floorNoise: " + floorNoise + " pulseElementSize: " + pulseElementSize;
@@ -78,11 +76,17 @@ public class RFPMessage
 			s += "\r\nPulses(uSec)=\r\n";
 			for (int i = 0; i < number + 2 && i < MAX_NB_RFLINK_PULSE; i++)
 				s += (pulses[i] * multiply) + ",";
-			return s.TrimEnd(',');
+			s = s.TrimEnd(',');
+			int val = TestEV1527();
+			if(val != 0)
+			{
+				s += "\r\nRecognize EV1527 frame: ID=" + (val >> 4) + ", CMD=" + (val & 0x0F);
+			}
+			return s;
 		}
 		public byte[] ToBinary()
 		{
-			byte[] bin = new byte[17 + number];
+			byte[] bin = new byte[17 + number + 2];
 			bin[0] = frameType;
 			Array.Copy(BitConverter.GetBytes(frequency), 0, bin, 1, 4);
 			bin[5] = (byte)RFLevel;
@@ -93,6 +97,7 @@ public class RFPMessage
 			bin[11] = delay;
 			bin[12] = multiply;
 			Array.Copy(BitConverter.GetBytes(time), 0, bin, 13, 4);
+			//Array.Copy(pulses, 0, bin, 17, pulses.Length);
 			unsafe
 			{
 				fixed (byte* bPtr = bin)
@@ -105,9 +110,41 @@ public class RFPMessage
 					}
 				}
 			}
-
-			//Array.Copy(pulses, 0, bin, 17, number+2);
 			return bin;
+		}
+		public int TestEV1527()
+		{
+			int val = 0;
+			if(number == 49)
+			{
+				float currentTimeSlot = 0;
+				for(int i=1;i < 49;i+=2)
+				{
+					int highTime = pulses[i] * multiply;
+					int lowTime = pulses[i + 1] * multiply;
+					int timeSlot = highTime + lowTime;
+					if (currentTimeSlot == 0)
+					{
+						currentTimeSlot = timeSlot;
+					}
+					else if (timeSlot < currentTimeSlot * 0.8 || timeSlot > currentTimeSlot * 1.2)
+					{
+						return 0;
+					}
+					else
+					{
+						// compute timeslot mean
+						currentTimeSlot = (currentTimeSlot *i  + timeSlot) / (i+1);
+					}
+					float ratio = Math.Max(highTime, lowTime) / (float)Math.Min(highTime, lowTime);
+					//if (ratio < 1.9 || ratio > 4.1)
+					//	return 0;
+					byte bitVal = (byte) (highTime > lowTime? 1 : 0);
+					val |= bitVal << (23 - (i/2));
+				}
+				return val;
+			}
+			return 0;
 		}
 	}
 	public override string ToString()
@@ -648,7 +685,7 @@ upon context	LSB first. Define provided data by the device
 		}
 	}
 	//TODO: FIXME (or check me)
-	// What happens if the size of byte array is less than the structure size (and it happens)
+	// What happens if the size of byte array is less than the structure size
 	unsafe T ByteArrayToStructure<T>(byte[] bytes, int startOffset = 0) where T : struct
 	{
 		fixed (byte* ptr = &bytes[startOffset])
@@ -671,6 +708,8 @@ upon context	LSB first. Define provided data by the device
 		frame.delay = bytes[startOffset + 11];
 		frame.multiply = bytes[startOffset + 12];
 		frame.time = BitConverter.ToUInt32(bytes, startOffset + 13);
+		//frame.pulses = new byte[frame.number + 2];
+		//Array.Copy(bytes, startOffset + 17, frame.pulses, 0, frame.number + 2);
 		unsafe
 		{
 			fixed (byte* bPtr = bytes)
@@ -683,7 +722,6 @@ upon context	LSB first. Define provided data by the device
 				}
 			}
 		}
-		//Array.Copy(bytes, 17,, 0, frame.number + 2);
 		return frame;
 	}
 }
