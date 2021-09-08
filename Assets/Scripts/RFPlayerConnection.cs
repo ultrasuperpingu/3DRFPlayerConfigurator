@@ -505,9 +505,11 @@ public class RFPlayerConnection : MonoBehaviour
 			{
 				// I guess we still need to read messages (not done in update since _updating == true) but not sure
 				RFPMessage message;
-				while((message = ReadMessage()) != null)
-				while((message = ReadMessage()) != null)
-					onMessageReceived.Invoke(message);
+				while ((message = ReadMessage()) != null)
+				{
+					if (onMessageReceived != null)
+						onMessageReceived.Invoke(message);
+				}
 				s_serial.Write(content, written, toWrite);
 			}
 			catch (Exception e)
@@ -534,12 +536,13 @@ public class RFPlayerConnection : MonoBehaviour
 
 	private void Update()
 	{
-		if (!_updating && DeviceConnected && s_serial.BytesToRead > 0)
+		if (!_updating && (_isMessagePending || DeviceConnected && s_serial.BytesToRead > 0))
 		{
 			var m = ReadMessage();
 			if (m != null)
 			{
-				onMessageReceived.Invoke(m);
+				if (onMessageReceived != null)
+					onMessageReceived.Invoke(m);
 			}
 		}
 	}
@@ -566,52 +569,88 @@ public class RFPlayerConnection : MonoBehaviour
 	private RFPMessage ReadMessage()
 	{
 		//Debug.Log("toread: " + s_serial.BytesToRead);
-		var nbReadNow = s_serial.Read(alreadyRead, nbRead, s_serial.BytesToRead);
-		nbRead += nbReadNow;
+		if (s_serial.BytesToRead > 0)
+		{
+			var nbReadNow = s_serial.Read(alreadyRead, nbRead, Math.Min(s_serial.BytesToRead, RECEIVE_BUFFER_SIZE - nbRead));
+			nbRead += nbReadNow;
+		}
 		//var message3 = Encoding.ASCII.GetString(alreadyRead, 0, nbRead);
 		//Debug.Log(message3);
-		if (nbRead < 3)
+		return DecodeMessage();
+	}
+
+	private RFPMessage DecodeMessage()
+	{
+		if (nbRead < 4)
 			return null;
 		if (alreadyRead[0] != 'Z' && alreadyRead[1] != 'I')
 		{
-			Debug.LogError("Message is not starting with ZI");
+			Debug.LogError("Message is not starting with ZI (begin:" + alreadyRead[0] + ")");
 			var message = Encoding.ASCII.GetString(alreadyRead, 0, nbRead);
 			Debug.LogError("ASCII: " + message);
 			message = BitConverter.ToString(alreadyRead, 0, nbRead).Replace("-", "");
 			Debug.LogError("HEXA: " + message);
-			nbRead = 0;
-			_isMessagePending = false;
+			// try to find ZI in the read bytes
+			int index = ziSearch.Search(alreadyRead);
+			if (index >= 0)
+			{
+				Array.Copy(alreadyRead, index, alreadyRead, 0, nbRead - index);
+				Debug.Log("Found message beginning at index " + index);
+				nbRead -= index;
+				if (nbRead > 0)
+					return DecodeMessage();
+			}
+			else
+			{
+				nbRead = 0;
+				_isMessagePending = false;
+			}
 			return null;
 		}
 		if (alreadyRead[2] >= 0x41) // ascii message
 		{
-			var message = Encoding.ASCII.GetString(alreadyRead, 0, nbRead);
-			//Debug.Log(message);
-			// TODO: find another message begining to see if there 2 messages in a row
-			if (alreadyRead[nbRead - 1] == '\0' || alreadyRead[nbRead - 1] == '\r') //ascii message end
+			//var message = Encoding.ASCII.GetString(alreadyRead, 0, nbRead);
+			//Debug.Log("in alreadyRead: " + message + " size:" + nbRead);
+			// Find the end of the message
+			int index = Array.IndexOf(alreadyRead, (byte)'\0', 3, nbRead - 3);
+			if (index >= 0)
+				index = Math.Min(index, Array.IndexOf(alreadyRead, (byte)'\r', 3, nbRead - 3));
+			else
+				index = Array.IndexOf(alreadyRead, (byte)'\r', 3, nbRead - 3);
+			//Debug.Log("end index: " + index);
+			if (index >= 0)
 			{
+				index += 1; // terminaison char is part of the message
+				RFPMessage m = new RFPMessage(RFPMessage.MessageType.ASCII, alreadyRead, 0, index);
+				//onMessageReceived.Invoke(m);
+				var message = Encoding.ASCII.GetString(alreadyRead, 0, index);
 				//onTextualMessageReceived.Invoke(message);
-				//Debug.Log(message);
-
-				RFPMessage m = null;
-				try
+				Debug.Log(message);
+				if (index != nbRead) // there is another message after
 				{
-					m = new RFPMessage(RFPMessage.MessageType.ASCII, alreadyRead, 0, nbRead);
+					if (index > nbRead)
+						Debug.LogError("how is it possible index=" + index + " nbRead=" + nbRead);
+					// copy the next message to begining of the array
+					// This call is safe
+					// https://docs.microsoft.com/en-us/dotnet/api/system.array.copy?redirectedfrom=MSDN&view=net-5.0#System_Array_Copy_System_Array_System_Int32_System_Array_System_Int32_System_Int32_
+					Array.Copy(alreadyRead, index, alreadyRead, 0, nbRead - index);
+					_isMessagePending = true;
+					nbRead -= index;
+					message = Encoding.ASCII.GetString(alreadyRead, 0, nbRead);
+					Debug.Log("Another message is pending: " + message);
 				}
-				catch(TypeLoadException e)
+				else
 				{
-					Debug.LogException(e);
-					Debug.LogError(e.Message);
+					_isMessagePending = false;
+					nbRead = 0;
 				}
-				onMessageReceived.Invoke(m);
-				nbRead = 0;
-				_isMessagePending = false;
 				return m;
 			}
 			// else message not complete
 			else
 			{
-				Debug.Log("not finished " + message + "\r\nend:" + alreadyRead[nbRead - 1]);
+				Debug.Log("ASCII message not finished (end:" + alreadyRead[nbRead - 1] + ")");
+				_isMessagePending = true;
 			}
 		}
 		else if (alreadyRead[2] <= 0x0A) // binary message
@@ -620,17 +659,19 @@ public class RFPlayerConnection : MonoBehaviour
 			if (nbRead >= binarySize + 5) // message is complete
 			{
 				var m = new RFPMessage(RFPMessage.MessageType.BINARY, alreadyRead, 0, binarySize + 5);
-				if(m.IsRFLink)
+				if (m.IsRFLink)
 				{
 					toReemit = m;
 				}
 				var message = BitConverter.ToString(alreadyRead, 0, nbRead).Replace("-", "");
 				Debug.Log("Binary received: size=" + nbRead + " read size: " + binarySize + " m:" + message);
-				onMessageReceived.Invoke(m);
+				//onMessageReceived.Invoke(m);
 				//onTextualMessageReceived.Invoke(message);
 				if (nbRead > binarySize + 5) // a second message arrived
 				{
-					// copy to the message to begining of the array
+					// copy the next message to begining of the array
+					// This call is safe
+					// https://docs.microsoft.com/en-us/dotnet/api/system.array.copy?redirectedfrom=MSDN&view=net-5.0#System_Array_Copy_System_Array_System_Int32_System_Array_System_Int32_System_Int32_
 					Array.Copy(alreadyRead, binarySize + 5, alreadyRead, 0, nbRead - binarySize + 5);
 					nbRead -= binarySize + 5;
 					_isMessagePending = true;
@@ -640,11 +681,12 @@ public class RFPlayerConnection : MonoBehaviour
 					nbRead = 0;
 					_isMessagePending = false;
 				}
+				return m;
 			}
 			//else message not complete.
 			else
 			{
-				//Debug.Log("not finished (size:" + (binarySize + 5) + ", read:" + nbRead + ")");
+				Debug.Log("not finished (size:" + (binarySize + 5) + ", read:" + nbRead + ")");
 				_isMessagePending = true;
 			}
 		}
@@ -658,7 +700,7 @@ public class RFPlayerConnection : MonoBehaviour
 			{
 				Array.Copy(alreadyRead, index, alreadyRead, 0, nbRead - index);
 				nbRead -= index;
-				if(nbRead > 0)
+				if (nbRead > 0)
 					_isMessagePending = true;
 			}
 			else
@@ -717,20 +759,37 @@ public class RFPlayerConnection : MonoBehaviour
 			Debug.Log("Already updating");
 			yield break;
 		}
+		// TODO: method SendCommandAndGetAnswer
 		while (_isMessagePending)
 			yield return null;
 		_updating = true;
-		Debug.Log("UpdateSystemStatus reading");
 		SendCommand("STATUS SYSTEM XML");
+		Debug.Log("UpdateSystemStatus reading");
 		yield return new WaitForSeconds(0.5f);
 
 		RFPMessage message;
+		int retry = 0;
 		do
 		{
 			message = ReadMessage();
 			if (message == null)
-				yield return null;
-		} while (_isMessagePending);
+			{
+				if (!_isMessagePending)
+				{
+					yield return null;
+					retry++;
+				}
+			}
+			else if (onMessageReceived != null)
+			{
+				onMessageReceived.Invoke(message);
+				if (message.IsAnswer)
+					break;
+				
+				retry++;
+				message = null;
+			}
+		} while (message == null || retry <= 2);
 		if(message == null)
 		{
 			Debug.LogError("No response");
@@ -837,14 +896,29 @@ public class RFPlayerConnection : MonoBehaviour
 			yield return null;
 		_updating = true;
 		SendCommand("STATUS RADIO XML");
-		yield return new WaitForSeconds(0.5f);
 		RFPMessage message;
+		int retry = 0;
 		do
 		{
 			message = ReadMessage();
-			if(message == null)
-				yield return null;
-		} while (_isMessagePending);
+			if (message == null)
+			{
+				if (!_isMessagePending)
+				{
+					yield return null;
+					retry++;
+				}
+			}
+			else if (onMessageReceived != null)
+			{
+				onMessageReceived.Invoke(message);
+				if (message.IsAnswer)
+					break;
+				
+				retry++;
+				message = null;
+			}
+		} while (message == null || retry <= 2);
 		if (message == null)
 		{
 			Debug.LogError("No response");
@@ -854,6 +928,7 @@ public class RFPlayerConnection : MonoBehaviour
 		try
 		{
 			XmlDocument doc = new XmlDocument();
+			Debug.Log(message.ASCII);
 			doc.LoadXml(message.ASCII.Substring(5));
 			var bands = doc.SelectNodes("/radioStatus/band");
 			bool freq868 = false; // first band is presume to be 433MHz, second 868

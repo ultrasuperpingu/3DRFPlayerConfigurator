@@ -16,6 +16,9 @@ public class RFPMessage
 		RFLINK = 1
 	}
 	string asciiContent;
+
+	public bool IsAnswer { get; private set; }
+
 	byte[] binaryContent;
 	FrameType frameType;
 	public bool IsRFLink
@@ -30,6 +33,7 @@ public class RFPMessage
 		if (t == MessageType.ASCII)
 		{
 			asciiContent = Encoding.ASCII.GetString(content, startIndex, count);
+			IsAnswer = asciiContent.StartsWith("ZIA--");
 		}
 		else
 		{
