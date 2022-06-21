@@ -16,14 +16,14 @@ public class RFPlayerConnection : MonoBehaviour
 	public UnityEvent onDisconnected;
 	public UnityEvent<RFPMessage> onMessageReceived;
 	public UnityEvent<string> onCommandSent;
-	
+
 	private SerialPort s_serial;
 	private const int RECEIVE_BUFFER_SIZE = 8192;
 	private const int UPDATE_FIRMWARE_PACKET_SIZE = 12000;
 	private byte[] alreadyRead = new byte[RECEIVE_BUFFER_SIZE];
 	private int nbRead = 0;
 	private BoyerMoore ziSearch = new BoyerMoore(new byte[] { (byte)'Z', (byte)'I' });
-	
+
 
 	public bool DeviceConnected
 	{
@@ -92,7 +92,7 @@ public class RFPlayerConnection : MonoBehaviour
 			if (_FrequencyL != value)
 			{
 				if (!_updating)
-					SendCommand("FREQ L " + (value.ToString().StartsWith("F")?value.ToString().Replace("F", ""):"0"));
+					SendCommand("FREQ L " + (value.ToString().StartsWith("F") ? value.ToString().Replace("F", "") : "0"));
 				_FrequencyL = value;
 				onFrequencyLChanged.Invoke((int)value);
 			}
@@ -330,7 +330,7 @@ public class RFPlayerConnection : MonoBehaviour
 			if (value != _Jamming && value >= 0 && value <= 10)
 			{
 				_Jamming = value;
-				if(!_updating)
+				if (!_updating)
 					SendCommand("JAMMING " + value);
 				onJammingChanged.Invoke(value);
 			}
@@ -341,7 +341,7 @@ public class RFPlayerConnection : MonoBehaviour
 		}
 	}
 	public UnityEvent<int> onJammingChanged;
-	
+
 	private string _MacAddress;
 	public string MacAddress
 	{
@@ -390,7 +390,7 @@ public class RFPlayerConnection : MonoBehaviour
 				_RFlinkEnable = value;
 				onRFLinkEnableChanged.Invoke(value);
 			}
-			else if(_updating)
+			else if (_updating)
 			{
 				onRFLinkEnableChanged.Invoke(value);
 			}
@@ -427,7 +427,7 @@ public class RFPlayerConnection : MonoBehaviour
 		}
 	}
 	public UnityEvent<string[]> onRepeaterProtocolsAvailableChanged;
-	
+
 	private string[] _ReceiverProtocolsAvailable = new string[]{
 		"X10", "RTS", "VISONIC", "BLYSS", "CHACON", "OREGONV1", "OREGONV2", "OREGONV3/OWL",
 		"DOMIA", "X2D", "KD101", "PARROT", "TIC", "FS20", "JAMMING", "EDISIO"
@@ -466,6 +466,36 @@ public class RFPlayerConnection : MonoBehaviour
 		}
 	}
 	public UnityEvent<bool[]> onReceiverProtocolsEnabledChanged;
+	
+	[Serializable]
+	public class ParrotMessageLearnt
+    {
+		public int ID;
+		public string Action;
+		public int ActionID;
+		public string Reminder;
+		public string Rank;
+		public int RequestNum;
+		public string Command
+        {
+			get { return Action+" PARROT ID "+ID; }
+        }
+		public override string ToString()
+        {
+			return "ReqNum: "+RequestNum+"\r\nCommand: "+Command+(Reminder == null ? "" : " ["+Reminder+"]")+"\r\nRank: "+Rank;
+        }
+    }
+	private ParrotMessageLearnt[] _ParrotMessagesLearnt = new ParrotMessageLearnt[0];
+	public ParrotMessageLearnt[] ParrotMessagesLearnt
+	{
+		get { return _ParrotMessagesLearnt; }
+		protected set
+		{
+			_ParrotMessagesLearnt = value;
+			onParrotMessagesLearntChanged.Invoke(value);
+		}
+	}
+	public UnityEvent<ParrotMessageLearnt[]> onParrotMessagesLearntChanged;
 
 	public UnityEvent<float> onFirmwareUpdateProgress;
 	public UnityEvent onFirmwareUpdateEnded;
@@ -649,7 +679,8 @@ public class RFPlayerConnection : MonoBehaviour
 			// else message not complete
 			else
 			{
-				Debug.Log("ASCII message not finished (end:" + alreadyRead[nbRead - 1] + ")");
+				var message = Encoding.ASCII.GetString(alreadyRead, 0, nbRead);
+				Debug.Log("ASCII message not finished (end:" + alreadyRead[nbRead - 1] + ") : "+message);
 				_isMessagePending = true;
 			}
 		}
@@ -719,6 +750,8 @@ public class RFPlayerConnection : MonoBehaviour
 	}
 	public void SendCommandWithoutLog(string command)
 	{
+		if (string.IsNullOrWhiteSpace(command))
+			return;
 		if (s_serial == null || !s_serial.IsOpen)
 		{
 			Debug.LogError("Can't send command because connection is not established");
@@ -1063,15 +1096,58 @@ public class RFPlayerConnection : MonoBehaviour
 		_updating = true;
 		SendCommand("STATUS PARROT XML");
 		yield return new WaitForSeconds(0.5f);
+		
 		RFPMessage message;
+		List<ParrotMessageLearnt> messages = new List<ParrotMessageLearnt>();
 		do
 		{
 			message = ReadMessage();
 			if (message == null)
+			{
 				yield return null;
+			}
+			if (message != null && message.Type == RFPMessage.MessageType.ASCII &&
+				message.ASCII.Contains("<parrotStatus>"))
+			{
+				XmlDocument doc = new XmlDocument();
+				doc.LoadXml(message.ASCII.Substring(5));
+				Debug.Log("ARHHHHHHHHHH: "+message.ASCII);
+				int reqNum = int.Parse(doc.DocumentElement.SelectSingleNode("reqNum").InnerText);
+				var items = doc.DocumentElement.SelectNodes("i");
+				ParrotMessageLearnt pm = new ParrotMessageLearnt();
+				messages.Add(pm);
+				foreach (XmlNode i in items)
+				{
+					string name = i.SelectSingleNode("n").InnerText;
+					string v = i.SelectSingleNode("v").InnerText;
+					string c = i.SelectSingleNode("c")?.InnerText;
+					if (name == "id")
+					{
+						pm.ID = int.Parse(v);
+					}
+					else if (name == "reminder")
+					{
+						pm.Reminder = v;
+					}
+					else if (name == "action")
+					{
+						pm.Action = c;
+						pm.ActionID = int.Parse(v);
+					}
+					else if (name == "rank")
+					{
+						pm.Rank = v;
+					}
+				}
+			}
+			else
+			{
+				if (message != null)
+					onMessageReceived.Invoke(message);
+				break;
+			}
 		} while (_isMessagePending);
-		XmlDocument doc = new XmlDocument();
-		doc.LoadXml(message.ASCII.Substring(5));
+		ParrotMessagesLearnt = messages.ToArray();
 		_updating = false;
 	}
 	#endregion

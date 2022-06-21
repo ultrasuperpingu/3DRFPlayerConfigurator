@@ -66,6 +66,53 @@ namespace SimpleFileBrowser
 			UpdateItemsInTheList();
 		}
 
+		public bool IsVisible(int index)
+        {
+			if (adapter.Count > 0)
+			{
+				float contentPos = contentTransform.anchoredPosition.y - 1f;
+
+				int newTopIndex = (int)(contentPos * _1OverItemHeight);
+				int newBottomIndex = (int)((contentPos + viewportHeight + 2f) * _1OverItemHeight);
+				return index > newTopIndex && index < newBottomIndex;
+			}
+			return false;
+		}
+		public int NbItemsVisible
+		{
+			get
+			{
+				if (adapter.Count > 0)
+				{
+					float contentPos = contentTransform.anchoredPosition.y - 1f;
+
+					int newTopIndex = (int)(contentPos * _1OverItemHeight);
+					int newBottomIndex = (int)((contentPos + viewportHeight + 2f) * _1OverItemHeight);
+					return newBottomIndex - newTopIndex - 1;
+				}
+				return 0;
+			}
+		}
+
+		public void EnsureVisible(int index)
+        {
+			if (adapter.Count > 0 && !IsVisible(index))
+			{
+				float newAnchoredY = index/_1OverItemHeight+1;
+				//float percentVisible = viewportHeight/contentTransform.sizeDelta.y;
+				GetComponent<ScrollRect>().verticalNormalizedPosition = 1-newAnchoredY/(contentTransform.sizeDelta.y-viewportHeight);
+				//float contentPos = contentTransform.anchoredPosition.y - 1f;
+
+				//int newTopIndex = (int)(contentPos * _1OverItemHeight);
+				//int newBottomIndex = (int)((contentPos + viewportHeight + 2f) * _1OverItemHeight);
+			}
+			float newHeight = Mathf.Max(1f, adapter.Count * itemHeight);
+			contentTransform.sizeDelta = new Vector2(0f, newHeight);
+			viewportHeight = viewportTransform.rect.height;
+
+			UpdateItemsInTheList(true);
+		}
+
 		// Calculate the indices of items to show
 		private void UpdateItemsInTheList( bool updateAllVisibleItems = false )
 		{

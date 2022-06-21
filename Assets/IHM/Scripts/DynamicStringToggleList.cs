@@ -7,7 +7,6 @@ using UnityEngine.UI;
 public class DynamicStringToggleList : MonoBehaviour
 {
 	public Toggle togglePrefab;
-	private ScrollRect scrollrect;
 	public RFPlayerConnection rfplayer;
 	public string command = "REPEATER";
 	public void SetList(string[] list)

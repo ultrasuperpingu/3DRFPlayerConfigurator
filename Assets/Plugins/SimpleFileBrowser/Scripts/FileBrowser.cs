@@ -789,9 +789,84 @@ namespace SimpleFileBrowser
 #if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
 					if( Keyboard.current[Key.A].wasPressedThisFrame && Keyboard.current.ctrlKey.isPressed )
 #else
-					if( Input.GetKeyDown( KeyCode.A ) && ( Input.GetKey( KeyCode.LeftControl ) || Input.GetKey( KeyCode.LeftCommand ) ) )
+					if (Input.GetKeyDown(KeyCode.A) && (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.LeftCommand)))
 #endif
 						SelectAllFiles();
+
+#if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
+					if( false )
+#else
+					if (!string.IsNullOrWhiteSpace(Input.inputString))
+#endif
+						SelectFileStartingWith(Input.inputString);
+
+#if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
+					if( Keyboard.current[Key.DownArrow].wasPressedThisFrame)
+#else
+					if (Input.GetKeyDown(KeyCode.DownArrow))
+#endif
+						SelectFileAtOffset(1);
+
+#if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
+					if( Keyboard.current[Key.UpArrow].wasPressedThisFrame)
+#else
+					if (Input.GetKeyDown(KeyCode.UpArrow))
+#endif
+						SelectFileAtOffset(-1);
+
+#if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
+					if( Keyboard.current[Key.UpArrow].wasPressedThisFrame)
+#else
+					if (Input.GetKeyDown(KeyCode.LeftArrow))
+#endif
+						OnBackButtonPressed();
+
+#if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
+					if( Keyboard.current[Key.UpArrow].wasPressedThisFrame)
+#else
+					if (Input.GetKeyDown(KeyCode.RightArrow))
+#endif
+						OnForwardButtonPressed();
+
+#if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
+					if( Keyboard.current[Key.PageDown].wasPressedThisFrame)
+#else
+					if (Input.GetKeyDown(KeyCode.PageDown))
+#endif
+						SelectFileAtOffset(listView.NbItemsVisible);
+
+#if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
+					if( Keyboard.current[Key.PageUp].wasPressedThisFrame)
+#else
+					if (Input.GetKeyDown(KeyCode.PageUp))
+#endif
+						SelectFileAtOffset(-listView.NbItemsVisible);
+
+#if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
+					if( Keyboard.current[Key.Backspace].wasPressedThisFrame)
+#else
+					if (Input.GetKeyDown(KeyCode.Backspace))
+#endif
+						OnUpButtonPressed();
+
+#if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
+					if( Keyboard.current[Key.Escape].wasPressedThisFrame)
+#else
+					if (Input.GetKeyDown(KeyCode.Escape))
+#endif
+						OnCancelButtonClicked();
+
+#if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
+					if( Keyboard.current[Key.Return].wasPressedThisFrame)
+#else
+					if (Input.GetKeyDown(KeyCode.Return))
+#endif
+						if(m_pickerMode == PickMode.Files && 
+							selectedFileEntries.Count == 1 && 
+							validFileEntries[selectedFileEntries[0]].IsDirectory)
+							CurrentPath = Path.Combine(m_currentPath, validFileEntries[selectedFileEntries[0]].Name);
+						else
+							OnSubmitButtonClicked();
 				}
 			}
 #endif
@@ -1784,6 +1859,60 @@ namespace SimpleFileBrowser
 			filesScrollRect.OnScroll( nullPointerEventData );
 		}
 
+
+		public void SelectFileStartingWith(string name)
+		{
+			if (validFileEntries.Count == 0)
+				return;
+
+			multiSelectionPivotFileEntry = 0;
+
+			selectedFileEntries.Clear();
+
+			int index = -1;
+			for (int i = 0; i < validFileEntries.Count; i++)
+			{
+				if (validFileEntries[i].Name.ToLowerInvariant().StartsWith(name))
+				{
+					selectedFileEntries.Add(i);
+					index = i;
+					break;
+				}
+			}
+#if !UNITY_EDITOR && !UNITY_STANDALONE && !UNITY_WSA && !UNITY_WSA_10_0
+			MultiSelectionToggleSelectionMode = true;
+#endif
+
+			UpdateFilenameInputFieldWithSelection();
+			if(index >= 0)
+				listView.EnsureVisible(index);
+			else
+				listView.UpdateList();
+		}
+		public void SelectFileAtOffset(int offset)
+        {
+			if (validFileEntries.Count == 0)
+				return;
+
+			multiSelectionPivotFileEntry = 0;
+			int index = 0;
+			if(selectedFileEntries.Count > 0)
+				index = selectedFileEntries[selectedFileEntries.Count-1];
+			index+=offset;
+			if(index < 0)
+				index = 0;
+			else if(index >= validFileEntries.Count)
+				index = validFileEntries.Count - 1;
+			selectedFileEntries.Clear();
+
+			selectedFileEntries.Add(index);
+					
+			UpdateFilenameInputFieldWithSelection();
+			if (index >= 0)
+				listView.EnsureVisible(index);
+			else
+				listView.UpdateList();
+		}
 		// Quickly selects all files and folders in the current directory
 		public void SelectAllFiles()
 		{

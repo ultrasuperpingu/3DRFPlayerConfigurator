@@ -3,6 +3,7 @@ using System.Collections;
 using System.IO;
 using SimpleFileBrowser;
 using TMPro;
+using UnityEngine.EventSystems;
 
 public class FileBrowseOpener : MonoBehaviour
 {
@@ -59,6 +60,7 @@ public class FileBrowseOpener : MonoBehaviour
 		{
 			initialPath = fileInput.text;
 		}
+		EventSystem.current.SetSelectedGameObject(null, new BaseEventData(EventSystem.current));
 		FileBrowser.ShowLoadDialog( ( paths ) => { Debug.Log( "Selected: " + paths[0] ); fileInput.text = paths[0]; },
 								   () => { Debug.Log( "Canceled file open" ); },
 								   FileBrowser.PickMode.Files, false, initialPath, initialFile);
