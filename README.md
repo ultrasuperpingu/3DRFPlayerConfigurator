@@ -6,8 +6,9 @@ The software propose almost the same features than the original Java RFPlayer co
  * Edit settings of the module
  * Console mode with documentation
  * Send command form
- * Parrot learning form
+ * Parrot learning form with learnt messages
  * Firmware update
+ * Detect and decode EV1527 frames (if RFLink enabled)
 
 ## Why 3D ?
 Possible answers:
