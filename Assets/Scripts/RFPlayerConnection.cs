@@ -558,22 +558,44 @@ public class RFPlayerConnection : MonoBehaviour
 		_updating = false;
 		s_serial.WriteTimeout = 200;
 	}
+	private string usbPort = null;
 
 	private void Start()
 	{
+		var args=Environment.GetCommandLineArgs();
+		for (int i = 0; i < args.Length; i++)
+		{
+			if (args[i] == "--port")
+			{
+				if (i+1 <  args.Length)
+					usbPort = args[i+1];
+				else
+					Debug.LogError("No port name provided after --port");
+				break;
+			}
+		}
 		checkPortCoroutine = StartCoroutine(CheckPortsForDevice());
 	}
 
 	private void Update()
 	{
-		if (!_updating && (_isMessagePending || DeviceConnected && s_serial.BytesToRead > 0))
+		try
 		{
-			var m = ReadMessage();
-			if (m != null)
+			if (!_updating && (_isMessagePending || DeviceConnected && s_serial.BytesToRead > 0))
 			{
-				if (onMessageReceived != null)
-					onMessageReceived.Invoke(m);
+				var m = ReadMessage();
+				if (m != null)
+				{
+					if (onMessageReceived != null)
+						onMessageReceived.Invoke(m);
+				}
 			}
+		}
+		catch (IOException e)
+		{
+			Debug.LogException(e);
+			DisposeSerial();
+			checkPortCoroutine = StartCoroutine(CheckPortsForDevice());
 		}
 	}
 	void OnApplicationQuit()
@@ -743,32 +765,51 @@ public class RFPlayerConnection : MonoBehaviour
 		return null;
 	}
 
-	public void SendCommand(string command)
+	public bool SendCommand(string command)
 	{
-		SendCommandWithoutLog(command);
+		bool res = SendCommandWithoutLog(command);
 		onCommandSent.Invoke(command);
+		return res;
 	}
-	public void SendCommandWithoutLog(string command)
+	public bool SendCommandWithoutLog(string command)
 	{
 		if (string.IsNullOrWhiteSpace(command))
-			return;
+			return false;
 		if (s_serial == null || !s_serial.IsOpen)
 		{
 			Debug.LogError("Can't send command because connection is not established");
-			return;
+			return false;
 		}
 		command = "ZIA++" + command;
 		Debug.Log("Sending command: " + command);
-		s_serial.WriteLine(command);
+		try
+		{
+			s_serial.WriteLine(command);
+		}
+		catch (IOException e)
+		{
+			Debug.LogError("Can't send command: " + e.ToString());
+			return false;
+		}
+		return true;
 	}
-	public void SendBinaryCommand(byte[] bcommand)
+	public bool SendBinaryCommand(byte[] bcommand)
 	{
 		if (s_serial == null || !s_serial.IsOpen)
 		{
 			Debug.LogError("Can't send command because connection is not established");
-			return;
+			return false;
 		}
-		s_serial.Write(bcommand, 0, bcommand.Length);
+		try
+		{
+			s_serial.Write(bcommand, 0, bcommand.Length);
+		}
+		catch (IOException e)
+		{
+			Debug.LogError("Can't send command: " + e.ToString());
+			return false;
+		}
+		return true;
 	}
 
 
@@ -1111,7 +1152,7 @@ public class RFPlayerConnection : MonoBehaviour
 			{
 				XmlDocument doc = new XmlDocument();
 				doc.LoadXml(message.ASCII.Substring(5));
-				Debug.Log("ARHHHHHHHHHH: "+message.ASCII);
+				//Debug.Log("ARHHHHHHHHHH: "+message.ASCII);
 				int reqNum = int.Parse(doc.DocumentElement.SelectSingleNode("reqNum").InnerText);
 				var items = doc.DocumentElement.SelectNodes("i");
 				ParrotMessageLearnt pm = new ParrotMessageLearnt();
@@ -1158,25 +1199,36 @@ public class RFPlayerConnection : MonoBehaviour
 		{
 			if (s_serial.IsOpen)
 			{
-				Debug.Log("Closing serial port");
+				Debug.Log("Closing serial port " + s_serial.PortName);
 				s_serial.Close();
 			}
 			s_serial.DataReceived -= serial_DataReceived;
 			s_serial.ErrorReceived -= serial_ErrorReceived;
 			s_serial.PinChanged -= serial_PinChanged;
 			s_serial = null;
+			onDisconnected.Invoke();
 		}
 	}
 
-	void OpenPort(string port)
+	bool OpenPort(string port)
 	{
-		s_serial = new SerialPort(port, 115200, Parity.None, 8, StopBits.One);
-		s_serial.DataReceived += serial_DataReceived;
-		s_serial.ErrorReceived += serial_ErrorReceived;
-		s_serial.PinChanged += serial_PinChanged;
-		s_serial.WriteTimeout = 200;
-		s_serial.ReadTimeout = 200;
-		s_serial.Open();
+		try
+		{
+			s_serial = new SerialPort(port, 115200, Parity.None, 8, StopBits.One);
+			s_serial.DataReceived += serial_DataReceived;
+			s_serial.ErrorReceived += serial_ErrorReceived;
+			s_serial.PinChanged += serial_PinChanged;
+			s_serial.WriteTimeout = 200;
+			s_serial.ReadTimeout = 200;
+			s_serial.Open();
+			return true;
+		}
+		catch(IOException e)
+		{
+			Debug.Log("Failed to open port '"+port+"' :" + e.ToString());
+			s_serial = null;
+		}
+		return false;
 	}
 
 	private void serial_PinChanged(object sender, SerialPinChangedEventArgs e)
@@ -1204,7 +1256,10 @@ public class RFPlayerConnection : MonoBehaviour
 					Debug.Log(p);
 					if (s_serial != null && s_serial.PortName == p)
 						continue;
-					OpenPort(p);
+					if (!string.IsNullOrEmpty(usbPort) && p != usbPort)
+						continue;
+					if (!OpenPort(p))
+						continue;
 					yield return new WaitForSeconds(0.2f);
 					SendCommand("HELLO");
 					yield return new WaitForSeconds(0.2f);
