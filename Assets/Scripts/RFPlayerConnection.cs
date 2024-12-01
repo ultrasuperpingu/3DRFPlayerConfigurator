@@ -784,7 +784,7 @@ public class RFPlayerConnection : MonoBehaviour
 		Debug.Log("Sending command: " + command);
 		try
 		{
-			s_serial.WriteLine(command);
+			s_serial.Write(command+"\r\n");
 		}
 		catch (IOException e)
 		{
@@ -1218,8 +1218,8 @@ public class RFPlayerConnection : MonoBehaviour
 			s_serial.DataReceived += serial_DataReceived;
 			s_serial.ErrorReceived += serial_ErrorReceived;
 			s_serial.PinChanged += serial_PinChanged;
-			s_serial.WriteTimeout = 200;
-			s_serial.ReadTimeout = 200;
+			s_serial.WriteTimeout = 1200;
+			s_serial.ReadTimeout = 1200;
 			s_serial.Open();
 			return true;
 		}
@@ -1263,17 +1263,24 @@ public class RFPlayerConnection : MonoBehaviour
 					yield return new WaitForSeconds(0.2f);
 					SendCommand("HELLO");
 					yield return new WaitForSeconds(0.2f);
-					var line = s_serial.ReadExisting();
-					if (!line.StartsWith("ZIA--"))
+					try
 					{
-						DisposeSerial();
+						var line = s_serial.ReadExisting();
+						if (line == null || !line.StartsWith("ZIA--"))
+						{
+							DisposeSerial();
+						}
+						else
+						{
+							SendCommand("FORMAT TEXT");
+							checkPortCoroutine = null;
+							onConnected.Invoke();
+							break;
+						}
 					}
-					else
+					catch (Exception e)
 					{
-						SendCommand("FORMAT TEXT");
-						checkPortCoroutine = null;
-						onConnected.Invoke();
-						break;
+						Debug.LogError("Error while initing RFPlayer communication: " + e);
 					}
 				}
 			}
