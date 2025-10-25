@@ -10,6 +10,10 @@ The software propose almost the same features than the original Java RFPlayer co
  * Firmware update
  * Detect and decode EV1527 (and PT2262) frames (if RFLink enabled)
 
+## Command Line Arguments
+ * You can specify the log file with -logFile (ex: 3D RFPlayer Configurator.exe -logFile log.txt)
+ * You can specify the serial port to use (by default, the software scan all ports) with --port (ex: 3D RFPlayer Configurator.exe --port COM2)
+
 ## Why 3D ?
 Possible answers:
  * Why not?
