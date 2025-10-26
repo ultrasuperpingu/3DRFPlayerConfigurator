@@ -62,3 +62,6 @@ crashlytics-build.properties
 /Assets/3D/rfplayer.blend1
 
 Build_Linux
+/BuildLinux
+/BuildTest
+/BuildWindows

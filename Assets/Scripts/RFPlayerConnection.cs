@@ -602,7 +602,7 @@ public class RFPlayerConnection : MonoBehaviour
 				}
 			}
 		}
-		catch (IOException e)
+		catch (Exception e)
 		{
 			Debug.LogException(e);
 			DisposeSerial();
@@ -815,7 +815,7 @@ public class RFPlayerConnection : MonoBehaviour
 		{
 			s_serial.Write(bcommand, 0, bcommand.Length);
 		}
-		catch (IOException e)
+		catch (Exception e)
 		{
 			Debug.LogError("Can't send command: " + e.ToString());
 			return false;
@@ -1234,7 +1234,7 @@ public class RFPlayerConnection : MonoBehaviour
 			s_serial.Open();
 			return true;
 		}
-		catch(IOException e)
+		catch(Exception e)
 		{
 			Debug.Log("Failed to open port '"+port+"' :" + e.ToString());
 			s_serial = null;
@@ -1283,7 +1283,15 @@ public class RFPlayerConnection : MonoBehaviour
 						continue;
 					}
 					if (!OpenPort(p))
+					{
+						if (!string.IsNullOrEmpty(usbPort) && !isUsbPortSpecifiedInCommandLine)
+						{
+							usbPort = null;
+							PlayerPrefs.SetString("port", "");
+							Debug.Log("Resetting usb port specification (last successfully opened port)");
+						}
 						continue;
+					}
 					yield return new WaitForSeconds(0.2f);
 					SendCommand("HELLO");
 					yield return new WaitForSeconds(0.2f);
@@ -1293,6 +1301,12 @@ public class RFPlayerConnection : MonoBehaviour
 						if (line == null || !line.StartsWith("ZIA--"))
 						{
 							Debug.Log("Device on port " + p + " doesn't responded to HELLO command");
+							if (!string.IsNullOrEmpty(usbPort) && !isUsbPortSpecifiedInCommandLine)
+							{
+								usbPort = null;
+								PlayerPrefs.SetString("port", "");
+								Debug.Log("Resetting usb port specification (last successfully opened port)");
+							}
 							DisposeSerial();
 						}
 						else
