@@ -559,6 +559,7 @@ public class RFPlayerConnection : MonoBehaviour
 		s_serial.WriteTimeout = 200;
 	}
 	private string usbPort = null;
+	private bool isUsbPortSpecifiedInCommandLine = false;
 
 	private void Start()
 	{
@@ -568,11 +569,21 @@ public class RFPlayerConnection : MonoBehaviour
 			if (args[i] == "--port")
 			{
 				if (i+1 <  args.Length)
+				{
 					usbPort = args[i+1];
+					isUsbPortSpecifiedInCommandLine = true;
+				}
 				else
+				{
 					Debug.LogError("No port name provided after --port");
+				}
 				break;
 			}
+		}
+		if( usbPort == null)
+		{
+			usbPort = PlayerPrefs.GetString("port");
+			isUsbPortSpecifiedInCommandLine = false;
 		}
 		checkPortCoroutine = StartCoroutine(CheckPortsForDevice());
 	}
@@ -786,9 +797,9 @@ public class RFPlayerConnection : MonoBehaviour
 		{
 			s_serial.Write(command+"\r\n");
 		}
-		catch (IOException e)
+		catch (Exception e)
 		{
-			Debug.LogError("Can't send command: " + e.ToString());
+			Debug.LogError("Can't send command: " + e);
 			return false;
 		}
 		return true;
@@ -1251,13 +1262,26 @@ public class RFPlayerConnection : MonoBehaviour
 			var ports = SerialPort.GetPortNames();
 			if (ports != null)
 			{
+				if (usbPort != null && !ports.Contains(usbPort))
+				{
+					Debug.Log("Specified port " + usbPort + " not found");
+					if (!isUsbPortSpecifiedInCommandLine)
+					{
+						usbPort = null;
+						Debug.Log("Ignoring usb port specification (last successfully opened port)");
+					}
+				}
 				foreach (var p in ports)
 				{
-					Debug.Log(p);
-					if (s_serial != null && s_serial.PortName == p)
+					Debug.Log("Testing Serial port: " +p);
+					if (s_serial != null && s_serial.PortName == p){
+						Debug.Log("Ignoring " + p + " because it is already open. Testing the next one.");
 						continue;
-					if (!string.IsNullOrEmpty(usbPort) && p != usbPort)
+					}
+					if (!string.IsNullOrEmpty(usbPort) && p != usbPort) {
+						Debug.Log("Ignoring " + p + " because port " + usbPort + " was specified");
 						continue;
+					}
 					if (!OpenPort(p))
 						continue;
 					yield return new WaitForSeconds(0.2f);
@@ -1268,10 +1292,13 @@ public class RFPlayerConnection : MonoBehaviour
 						var line = s_serial.ReadExisting();
 						if (line == null || !line.StartsWith("ZIA--"))
 						{
+							Debug.Log("Device on port " + p + " doesn't responded to HELLO command");
 							DisposeSerial();
 						}
 						else
 						{
+							Debug.Log("Correctly connected on port " + p);
+							PlayerPrefs.SetString("port", p);
 							SendCommand("FORMAT TEXT");
 							checkPortCoroutine = null;
 							onConnected.Invoke();
